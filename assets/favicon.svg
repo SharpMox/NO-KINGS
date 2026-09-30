@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="7" fill="#0f0a1c"/>
+  <!-- Crown sits wholly inside the ring, with deep valleys and a base band:
+       the slash cuts across it, so the silhouette has to survive being broken.
+       Earlier passes used a shallower crown and it read as an envelope. -->
+  <path d="M8 23v-4.5h16V23z M8 18.5V9l4 3.5L16 6.5l4 6L24 9v9.5z" fill="#efeaff"/>
+  <!-- Prohibition sign: hollow ring so the crown shows through, slash running
+       upper-left to lower-right. The ring carries the mark at 16px, so it gets
+       the heavier stroke. -->
+  <g fill="none" stroke="#e5352b" stroke-linecap="butt">
+    <circle cx="16" cy="16" r="11" stroke-width="3"/>
+    <line x1="8.22" y1="8.22" x2="23.78" y2="23.78" stroke-width="2.6"/>
+  </g>
+</svg>

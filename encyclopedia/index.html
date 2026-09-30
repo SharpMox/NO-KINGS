@@ -1,0 +1,706 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="The NO KINGS encyclopedia: a visual movement reference for 100 chess pieces, grouped by movement family, with Betza notation and SVG diagrams.">
+  <title>NO KINGS / Encyclopedia</title>
+  <style>
+    /* ============== Header ============== */
+    header {
+      max-width: var(--wrap);
+      margin: 0 auto;
+      padding: 32px 22px 16px;
+    }
+    h1 {
+      margin: 0 0 8px 0;
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    .intro {
+      color: var(--text-soft);
+      max-width: 760px;
+      margin: 0 0 24px 0;
+      font-size: 15px;
+    }
+    .sr { position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+          overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
+
+    /* ============== Filter zone ==============
+       Same chip pattern as the other pages: a collapsible Filters box holding
+       two rows of pill toggles, with the legend beneath it. Chips are
+       multi-select — OR within a row, AND across the two rows. */
+    .bar { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; margin-bottom: 20px; }
+    /* The button IS the container: closed it hugs its own label, open it grows
+       into the panel holding the two rows. Same shell as fusion/inversion/
+       promotion, so the control reads identically across the site. */
+    .fbox {
+      display: inline-flex; align-items: flex-start; gap: 14px;
+      width: max-content; max-width: 100%;
+      border: 1px solid var(--border); border-radius: var(--rad-ctl);
+      background: linear-gradient(150deg, rgba(160,112,232,.06), color-mix(in srgb,var(--glass-wash) 9%,transparent) 48%),
+                  color-mix(in srgb, var(--surface) 52%, transparent);
+      backdrop-filter: blur(14px) saturate(150%);
+      -webkit-backdrop-filter: blur(14px) saturate(150%);
+      box-shadow: inset 0 1px 0 color-mix(in srgb,var(--glass-rim) 13%,transparent);
+    }
+    @media (prefers-reduced-transparency: reduce) {
+      .fbox { background: var(--surface); backdrop-filter: none; -webkit-backdrop-filter: none; }
+    }
+    /* open, the box claims the full width of the bar */
+    .bar:has(.filt[aria-expanded="true"]) .fbox { width: auto; align-self: stretch; }
+    .filt {
+      appearance: none; cursor: pointer; font: 700 10.5px/1 var(--mono); letter-spacing: .09em;
+      text-transform: uppercase; padding: 0 16px; min-height: 42px; border: 0; background: transparent;
+      color: var(--text-soft); display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto;
+      transition: color .18s var(--ease);
+    }
+    .fbox:hover .filt, .filt[aria-expanded="true"] { color: var(--text); }
+    /* open, drop the label onto the first chip row's text line */
+    .filt[aria-expanded="true"] { align-items: flex-start; padding-top: 22px; min-height: 0; }
+    /* how many are on, since the rows are usually closed */
+    .filt .n {
+      font: 700 9.5px/1 var(--mono); color: var(--dark-ink); background: var(--lime);
+      border-radius: var(--rad-pill); padding: 3px 6px;
+    }
+    .filt .n:empty { display: none; }
+    .chip-rows { display: flex; flex-direction: column; gap: 7px; flex: 1 1 auto; padding: 11px 14px 11px 0; }
+    .chip-rows[hidden] { display: none; }
+    /* while the frame animates it must not be flex-sized, and it clips so the
+       rows are revealed by the edge rather than reflowing behind it */
+    .fbox.sizing { flex: 0 0 auto; overflow: hidden; }
+    .fbox.sizing .chip-rows { flex: 0 0 auto; }
+    .chips { display: flex; gap: 7px; flex-wrap: wrap; }
+    .chip {
+      appearance: none; cursor: pointer;
+      font: 700 11px/1 var(--mono); letter-spacing: .09em; text-transform: uppercase;
+      padding: 11px 15px; border-radius: var(--rad-pill);
+      border: 1px solid var(--border); background: var(--surface); color: var(--text-soft);
+      display: inline-flex; align-items: center; gap: 7px;
+      transition: color .18s var(--ease), border-color .18s var(--ease), transform .18s var(--ease);
+    }
+    .chip:hover:not(:disabled) { color: var(--text); border-color: var(--violet-hi); transform: translateY(-1px); }
+    /* White on --violet is 7.21:1 light / 5.84:1 dark — both AA at this weight.
+       Violet rather than the lime the stack pages use: deliberately different. */
+    .chip[aria-pressed="true"] { background: var(--violet); border-color: transparent; color: #fff; }
+    .chip:disabled { opacity: .4; cursor: default; }
+    /* Hierarchy comes from size, not opacity: opacity composites the text
+       against the chip and drops these 10px counters below 4.5:1. */
+    .chip-n {
+      font-size: 10px; letter-spacing: 0; color: var(--text-dim);
+      font-variant-numeric: tabular-nums;
+    }
+    .chip[aria-pressed="true"] .chip-n { color: #fff; }
+
+
+    /* ============== Legend ==============
+       Runs beneath the Filters box, full width, with no box of its own. */
+    .legend {
+      align-self: stretch;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 18px;
+      font-size: 12.5px;
+      color: var(--text-soft);
+      margin: 0;
+    }
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .legend-swatch {
+      width: 24px;
+      height: 24px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ============== Main ============== */
+    main {
+      max-width: none;
+      margin: 0 auto;
+      padding: 0 10px 64px;
+    }
+    .empty { padding: 90px 0; text-align: center; color: var(--text-dim); }
+    /* [hidden] is a UA rule, so ANY author `display` outranks it — and both of
+       these set one below. Without this the filter sets the attribute and the
+       cards stay on screen. */
+    .card[hidden], .card-grid[hidden] { display: none; }
+
+    /* ============== Card grid ============== */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 20px;
+    }
+    /* Glass, same treatment as the codex side panel: a tinted wash over a
+       part-transparent surface, blurred so the aura below shows through. */
+    .card {
+      background:
+        linear-gradient(150deg, rgba(160,112,232,.12), color-mix(in srgb,var(--glass-wash) 14%,transparent) 46%),
+        color-mix(in srgb, var(--surface) 54%, transparent);
+      backdrop-filter: blur(16px) saturate(150%);
+      -webkit-backdrop-filter: blur(16px) saturate(150%);
+      /* The rim is struck from --text, not --border: --border at 72% composites
+         to within a few units of the card fill, so the edge disappeared. A
+         percentage of the text colour always contrasts with its own surface,
+         in either theme. The inset highlight is the lit top edge. */
+      border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
+      border-radius: var(--rad-sm);
+      padding: 18px;
+      box-shadow: var(--shadow), inset 0 1px 0 color-mix(in srgb, var(--text) 10%, transparent);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      scroll-margin-top: 24px;
+    }
+    /* Glass needs something behind it, and it must stay readable without it. */
+    @media (prefers-reduced-transparency: reduce) {
+      .card { background: var(--surface); backdrop-filter: none; -webkit-backdrop-filter: none; }
+    }
+    /* The aura is what the cards' blur actually has to work on. The other
+       redesigned pages only tint the top corners, which is fine there because
+       their content overlaps; here the grid runs the length of the page, so
+       the wash has to reach it or the blur is sampling flat colour and the
+       glass reads as a plain panel. Fixed, so it shifts under the cards as
+       the grid scrolls. */
+    body::before {
+      content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+      background:
+        radial-gradient(720px 460px at 12% -6%, rgba(106,46,208,.16), transparent 68%),
+        radial-gradient(560px 380px at 92% 4%, rgba(111,148,32,.13), transparent 66%),
+        radial-gradient(900px 700px at 78% 62%, rgba(106,46,208,.10), transparent 70%),
+        radial-gradient(800px 620px at 18% 96%, rgba(111,148,32,.09), transparent 70%);
+    }
+    [data-theme="dark"] body::before {
+      background:
+        radial-gradient(720px 460px at 12% -6%, rgba(122,58,232,.34), transparent 68%),
+        radial-gradient(560px 380px at 92% 4%, rgba(168,208,72,.15), transparent 66%),
+        radial-gradient(900px 700px at 78% 62%, rgba(122,58,232,.20), transparent 70%),
+        radial-gradient(800px 620px at 18% 96%, rgba(168,208,72,.10), transparent 70%);
+    }
+    .card-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .card-name {
+      font-size: 20px;
+      font-weight: 600;
+      margin: 0;
+    }
+    .card-aliases {
+      font-size: 12px;
+      color: var(--text-soft);
+      font-style: italic;
+      display: block;
+      margin-top: -4px;
+    }
+    .card-board {
+      align-self: center;
+      width: 100%;
+      max-width: 280px;
+    }
+    .board {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: var(--rad-ctl);
+      overflow: hidden;
+      background: var(--sq-light);
+    }
+    .card-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+    .betza-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 3px 9px;
+      border-radius: var(--rad-ctl);
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+    .betza-chip-label {
+      color: var(--text-soft);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+    .origin-tag {
+      font-size: 10px;
+      color: var(--text-soft);
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      font-weight: 600;
+    }
+    .card-desc {
+      font-size: 14px;
+      color: var(--text);
+      margin: 0;
+    }
+    .behavior-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      padding: 3px 9px;
+      border-radius: var(--rad-sm);
+      font-size: 11px;
+      color: var(--text-soft);
+      font-weight: 500;
+    }
+    /* Behaviour badges: their own 8-hue palette, one text + edge pair per hue,
+       set per theme here so the rules below carry no hex. Leaper blue is the
+       diagram move colour. */
+    :root {
+      --bd-violet: #8a4ea8; --bd-violet-edge: #c2a3d0;
+      --bd-blue-edge: #a9c8eb;
+      --bd-green: #227850;  --bd-green-edge: #a0d6bc;
+      --bd-red: #b94040;    --bd-red-edge: #e8a8a8;
+      --bd-orange: #ac4d1d; --bd-orange-edge: #e8b497;
+      --bd-gold: #896300;   --bd-gold-edge: #e6cb8a;
+      --bd-grey: #6b6258;
+      --bd-teal: #26756b;   --bd-teal-edge: #95c5be;
+    }
+    [data-theme="dark"] {
+      --bd-violet: #c890e8; --bd-violet-edge: #5d4072;
+      --bd-blue-edge: #3a5378;
+      --bd-green: #6dd6a8;  --bd-green-edge: #2f5a44;
+      --bd-red: #ff7878;    --bd-red-edge: #6e3030;
+      --bd-orange: #ff9050; --bd-orange-edge: #6e4530;
+      --bd-gold: #e8c060;   --bd-gold-edge: #6e5a30;
+      --bd-grey: #b8aa98;
+      --bd-teal: #6ed4c2;   --bd-teal-edge: #2f6056;
+    }
+    .badge-color-bound, .badge-capture-different { color: var(--bd-violet); border-color: var(--bd-violet-edge); }
+    .badge-leaper       { color: var(--move-color); border-color: var(--bd-blue-edge); }
+    .badge-hopper       { color: var(--bd-green); border-color: var(--bd-green-edge); }
+    .badge-royal, .badge-capture-only { color: var(--bd-red); border-color: var(--bd-red-edge); }
+    .badge-long-range   { color: var(--bd-orange); border-color: var(--bd-orange-edge); }
+    .badge-promotes     { color: var(--bd-gold); border-color: var(--bd-gold-edge); }
+    .badge-direction-restricted { color: var(--bd-grey); }
+    .badge-compound     { color: var(--bd-teal); border-color: var(--bd-teal-edge); }
+
+    .card.highlight {
+      outline: 3px solid var(--accent);
+      outline-offset: 4px;
+      animation: pulse 1.5s ease-out;
+    }
+    @keyframes pulse {
+      0%   { outline-color: var(--accent); }
+      100% { outline-color: transparent; }
+    }
+
+
+
+    /* ============== Responsive ============== */
+    @media (max-width: 720px) {
+      .card-grid { grid-template-columns: 1fr; }
+      h1 { font-size: 26px; }
+    }
+
+    /* Phones: compact the chips. `.bar`-scoped so these outrank site.css's
+       shared 44px tap targets, same as the other pages do. */
+    @media (max-width: 560px) {
+      .bar { gap: 7px; }
+      .bar .chips { gap: 5px; }
+      .bar .chip { padding: 7px 10px; font-size: 10px; letter-spacing: .05em; }
+      .legend { font-size: 11.5px; gap: 6px 12px; }
+      /* Deep-linked cards must clear the sticky header. nav.js measures it
+         into --nav-h, so this no longer goes stale when the nav changes shape. */
+      .card { scroll-margin-top: calc(var(--nav-h) + 12px); }
+    }
+
+    /* ============== Print ============== */
+    @media print {
+      body { background: white; color: black; }
+      body::before { display: none; }
+      .bar { display: none; }
+      .card {
+        break-inside: avoid; box-shadow: none;
+        background: none; backdrop-filter: none; -webkit-backdrop-filter: none;
+      }
+      /* filters do not apply on paper — show every piece */
+      .card[hidden] { display: flex !important; }
+    }
+
+    /* Shared a11y (.sr-only, :focus-visible, reduced-motion) lives in assets/site.css. */
+  </style>
+  <link rel="stylesheet" href="../assets/site.css">
+  <link rel="stylesheet" href="../assets/nav.css">
+  <script src="../assets/theme-init.js"></script>
+  <script src="../assets/board.js"></script>
+  <script src="../data/pieces-encyclopedia.js"></script>
+</head>
+<body>
+  <div id="site-nav" data-page="encyclopedia" data-base="../"></div>
+  <header>
+    <h1><em>Piece Encyclopedia</em></h1>
+    <p class="intro">
+      A visual reference for the movement of 100 <em>non-standard chess pieces</em>, drawn from chess variants and chess-problem composition.
+      Filter by how a piece moves, by where it came from, or by both at once.
+      Sourced from <a href="https://en.wikipedia.org/wiki/List_of_fairy_chess_pieces" target="_blank" rel="noopener">Wikipedia's <em>piece list</em></a>.
+    </p>
+    <search class="bar">
+      <div class="fbox">
+        <button class="filt" type="button" aria-expanded="false" aria-controls="enc-chips">Filters <span class="n"></span></button>
+        <div class="chip-rows" id="enc-chips" hidden>
+      <div class="chips" role="group" aria-label="Filter by movement family">
+        <button class="chip" type="button" data-fam="pawn-like" aria-pressed="false">Pawn-like <span class="chip-n" id="count-pawn-like">0</span></button>
+        <button class="chip" type="button" data-fam="sliders" aria-pressed="false">Sliders <span class="chip-n" id="count-sliders">0</span></button>
+        <button class="chip" type="button" data-fam="leapers" aria-pressed="false">Leapers <span class="chip-n" id="count-leapers">0</span></button>
+        <button class="chip" type="button" data-fam="leap-riders" aria-pressed="false">Leap-Riders <span class="chip-n" id="count-leap-riders">0</span></button>
+        <button class="chip" type="button" data-fam="compounds" aria-pressed="false">Compounds <span class="chip-n" id="count-compounds">0</span></button>
+        <button class="chip" type="button" data-fam="hoppers" aria-pressed="false">Hoppers <span class="chip-n" id="count-hoppers">0</span></button>
+        <button class="chip" type="button" data-fam="others" aria-pressed="false">Others <span class="chip-n" id="count-others">0</span></button>
+      </div>
+      <div class="chips" role="group" aria-label="Filter by origin">
+        <button class="chip" type="button" data-ori="standard" aria-pressed="false">Standard <span class="chip-n" id="count-origin-standard">0</span></button>
+        <button class="chip" type="button" data-ori="modern" aria-pressed="false">Modern <span class="chip-n" id="count-origin-modern">0</span></button>
+        <button class="chip" type="button" data-ori="problem" aria-pressed="false">Problem <span class="chip-n" id="count-origin-problem">0</span></button>
+        <button class="chip" type="button" data-ori="shogi" aria-pressed="false">Shōgi <span class="chip-n" id="count-origin-shogi">0</span></button>
+        <button class="chip" type="button" data-ori="xiangqi" aria-pressed="false">Xiangqi <span class="chip-n" id="count-origin-xiangqi">0</span></button>
+        <button class="chip" type="button" data-ori="shatranj" aria-pressed="false">Shatranj <span class="chip-n" id="count-origin-shatranj">0</span></button>
+        <button class="chip" type="button" data-ori="tamerlane" aria-pressed="false">Tamerlane <span class="chip-n" id="count-origin-tamerlane">0</span></button>
+        <button class="chip" type="button" data-ori="historical" aria-pressed="false">Others <span class="chip-n" id="count-origin-historical">0</span></button>
+      </div>
+        </div>
+      </div>
+      <div class="legend" aria-label="Diagram legend">
+
+      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="5.5" fill="var(--move-color)"/></svg></span> Move &amp; capture</span>
+      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="5.5" fill="none" stroke="var(--move-color)" stroke-width="2.2"/></svg></span> Move only</span>
+      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><line x1="6.5" y1="6.5" x2="17.5" y2="17.5" stroke="var(--capture-color)" stroke-width="2.6" stroke-linecap="round"/><line x1="17.5" y1="6.5" x2="6.5" y2="17.5" stroke="var(--capture-color)" stroke-width="2.6" stroke-linecap="round"/></svg></span> Capture only</span>
+      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><line x1="12" y1="20" x2="12" y2="6" stroke="var(--ray-color)" stroke-width="2.6" stroke-linecap="round"/><polygon points="12,3 8,9 16,9" fill="var(--ray-color)"/></svg></span> Slide any distance</span>
+      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><rect x="4.5" y="4.5" width="15" height="15" fill="none" stroke="var(--hurdle-color)" stroke-width="2" stroke-dasharray="3 2"/></svg></span> Hurdle (piece to jump)</span>
+      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><polygon points="12,4 18,12 12,20 6,12" fill="var(--hop-target)"/></svg></span> Hop landing (move &amp; capture)</span>
+      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="6" fill="none" stroke="var(--hop-target)" stroke-width="2.2"/></svg></span> Hop landing (move only)</span>
+      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="7" cy="17" r="2.3" fill="var(--rider-color)"/><circle cx="17" cy="7" r="2.3" fill="var(--rider-color)"/><line x1="7" y1="17" x2="17" y2="7" stroke="var(--rider-color)" stroke-width="1.2" stroke-dasharray="2 2" opacity="0.6"/></svg></span> Rider (repeats leap)</span>
+      </div>
+    </search>
+  </header>
+
+  <main>
+    <div class="card-grid" id="grid"></div>
+    <p class="empty" id="empty" hidden>No pieces match these filters.</p>
+  </main>
+
+  <footer>
+    <p class="footer-page-line">A visual reference of <strong>100 pieces</strong>, organised by movement family and by historical origin.</p>
+    <p>Sourced from the <a href="https://en.wikipedia.org/wiki/List_of_fairy_chess_pieces" target="_blank" rel="noopener">Wikipedia piece list</a> and <a href="https://en.wikipedia.org/wiki/Fairy_chess_piece" target="_blank" rel="noopener">Betza's notation</a>. Built as a single static HTML file — no servers, no frameworks.</p>
+  </footer>
+
+  <script>
+  /* ============================================================
+   *  Data
+   * ============================================================ */
+  const PIECES = PIECES_ENCYCLOPEDIA;
+
+  const FAMILY_ORDER = ['pawn-like', 'sliders', 'leapers', 'leap-riders', 'compounds', 'hoppers', 'others'];
+
+  // Per-tab ordering by rough complexity (familiar → unusual → compound → complex).
+  // Pieces not listed here fall to the end of their tab.
+  const PIECE_ORDER = {
+    'pawn-like': [
+      'pawn', 'chinese-pawn', 'korean-pawn', 'berolina',
+      'hiashatar-pawn', 'torpedo-pawn', 'corporal',
+      'berolina-plus', 'arrow-pawn', 'sergeant'
+    ],
+    'sliders': [
+      'rook', 'bishop', 'queen',
+      'lance', 'bodyguard', 'edgehog',
+      'reflecting-bishop', 'hunter'
+    ],
+    'leapers': [
+      // Standard short leapers
+      'wazir', 'ferz', 'dabbaba', 'alfil', 'knight',
+      // Larger single (m,n) leapers, ascending in distance
+      'threeleaper', 'fourleaper', 'camel', 'zebra', 'giraffe',
+      'tripper', 'stag', 'antelope', 'commuter',
+      // Blockable / direction-restricted variants
+      'mao',
+      // King-move family (4–8 directions, one step)
+      'king', 'mann', 'anti-king', 'prince',
+      'xiangqi-general', 'advisor',
+      'silver-general', 'gold-general',
+      // 2-component leaper compounds (small components)
+      'phoenix', 'kirin', 'war-machine', 'elephant-modern',
+      'alibaba', 'gnu', 'centaur', 'kangaroo', 'mounted-king',
+      // 2-component leaper compounds (longer-range components)
+      'bison', 'roc', 'newt', 'leon',
+      'auroch', 'okapi', 'impala', 'pegasus',
+      // 3+ component compounds
+      'high-priestess', 'champion', 'squirrel', 'buffalo'
+    ],
+    'leap-riders': [
+      'nightrider', 'camelrider', 'alfilrider', 'dabbabarider',
+      'alibabarider', 'gnurider'
+    ],
+    'compounds': [
+      // Classic slider+leaper compounds
+      'amazon', 'archbishop', 'chancellor',
+      // Shōgi-derived promoted-piece compounds
+      'dragon-king', 'dragon-horse',
+      // Royal compound versions
+      'maharaja',
+      // Slider + leaper variants
+      'caliph', 'canvasser', 'crown-princess',
+      // Slider + leap-rider variants
+      'raven', 'banshee', 'amazonrider',
+      // Most complex / direction-asymmetric
+      'eagle'
+    ],
+    'hoppers': [
+      // Foundational hopper
+      'grasshopper',
+      // Variants of grasshopper-style hopping
+      'equihopper', 'lion',
+      // Capture-only hopper
+      'locust',
+      // Cannon family (move-and-capture differ)
+      'cannon', 'vao', 'leo', 'nao',
+      // Restricted-line grasshoppers
+      'bishopper', 'nightriderhopper',
+      // Inverse cannons (capture freely, move by hop)
+      'faro', 'loco'
+    ],
+    'others': [
+      // Zigzag (90° turn after each step)
+      'boyscout', 'girlscout',
+      // Single-bend riders
+      'gryphon', 'manticore', 'astrologer',
+      // Closed-cycle nightrider
+      'quintessence',
+      // Compound bent rider
+      'godzilla'
+    ]
+  };
+
+  function renderCard(piece) {
+    const aliases = piece.aliases && piece.aliases.length
+      ? `<span class="card-aliases">aka ${esc(piece.aliases.join(', '))}</span>` : '';
+    const betza = piece.betza
+      ? `<span class="betza-chip"><span class="betza-chip-label">Betza</span>${esc(piece.betza)}</span>`
+      : '';
+    const value = piece.value != null
+      ? `<span class="betza-chip"><span class="betza-chip-label">Value</span>${esc(piece.value)}</span>`
+      : '';
+    const badges = (piece.behaviors || []).map(b =>
+      `<span class="badge badge-${esc(b)}">${esc(b.replace(/-/g, ' '))}</span>`
+    ).join('');
+    const searchHaystack = [
+      piece.name,
+      (piece.aliases || []).join(' '),
+      piece.betza || '',
+      (piece.behaviors || []).join(' '),
+      piece.origin,
+      piece.description
+    ].join(' ').toLowerCase();
+
+    const idSuffix = piece._idSuffix || '';
+    return `
+      <article class="card" id="piece-${esc(piece.id + idSuffix)}" data-search="${esc(searchHaystack)}">
+        <div class="card-header">
+          <div>
+            <h2 class="card-name">${esc(piece.name)}</h2>
+            ${aliases}
+          </div>
+          <span class="origin-tag">${esc(piece.origin)}</span>
+        </div>
+        <div class="card-board">${renderBoard(piece)}</div>
+        <div class="card-meta">
+          ${betza}
+          ${value}
+        </div>
+        <p class="card-desc">${esc(piece.description)}</p>
+        ${badges ? `<div class="behavior-badges">${badges}</div>` : ''}
+      </article>
+    `;
+  }
+
+
+  // Catalog text is hand-copied from Notion: escape every interpolated field so
+  // a stray `<` or pasted markup renders as text, never as HTML.
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  /* ============================================================
+   *  Init
+   * ============================================================ */
+
+  // Bucket by family so PIECE_ORDER can sort within each, then flatten once.
+  // The page renders ONE grid: previously every piece was emitted up to three
+  // times (family tab + "all" tab + origin tab), ~300 cards for 100 pieces.
+  const grouped = Object.fromEntries(FAMILY_ORDER.map(f => [f, []]));
+  for (const p of PIECES) {
+    if (!grouped[p.family]) {
+      console.warn('Unknown family for piece', p.id, p.family);
+      grouped['others'].push(p);
+    } else {
+      grouped[p.family].push(p);
+    }
+  }
+  for (const f of FAMILY_ORDER) {
+    const order = PIECE_ORDER[f] || [];
+    grouped[f].sort((a, b) => {
+      const ai = order.indexOf(a.id), bi = order.indexOf(b.id);
+      if (ai === -1 && bi === -1) return 0;
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    });
+  }
+
+  const ORIGIN_BUCKETS = [
+    { id: 'standard',   origins: ['Standard'] },
+    { id: 'modern',     origins: ['Modern', 'Modern variants', 'Modern variants (Betza, Gilman, Cazaux)', 'Omega Chess', 'Maharajah and the Sepoys'] },
+    { id: 'problem',    origins: ['Problem chess'] },
+    { id: 'shogi',      origins: ['Shōgi', 'Chu Shōgi', 'Tori Shōgi'] },
+    { id: 'xiangqi',    origins: ['Xiangqi', 'Xiangqi-derived'] },
+    { id: 'shatranj',   origins: ['Shatranj'] },
+    { id: 'tamerlane',  origins: ['Tamerlane chess', 'Tamerlane Chess'] },
+    { id: 'historical', origins: ['Janggi (Korean chess)', 'Hiashatar (Mongolian decimal chess)', 'Courier chess', 'Grant Acedrex (1283)', 'Edgehog Chess (Driver, 1966)', 'Berolina Plus', 'Improved Pawn variant', 'Extended Pawn variant', 'Arrow Pawn Chess (Persson, 1938)', 'Torpedo Chess / Metamachy / Gigachess', 'The Ouroboros King'] }
+  ];
+  const originToBucket = new Map();
+  for (const b of ORIGIN_BUCKETS) for (const o of b.origins) originToBucket.set(o, b.id);
+
+  const ALL = FAMILY_ORDER.flatMap(f => grouped[f]);
+  for (const p of ALL) {
+    p._bucket = originToBucket.get(p.origin) || '';
+    if (!p._bucket) console.warn('Unbucketed origin:', p.origin, 'on piece', p.id);
+  }
+  document.getElementById('grid').innerHTML = ALL.map(renderCard).join('');
+
+  // Pair every card element with its piece once, so filtering never re-queries.
+  const CARDS = Array.from(document.querySelectorAll('#grid .card'))
+    .map((el, i) => ({ el, piece: ALL[i], hay: el.dataset.search || '' }));
+
+  /* ============================================================
+   *  Filtering — chips are multi-select: OR within a row, AND across rows.
+   *  Counts are facet counts: each chip shows what it WOULD yield, i.e. its
+   *  own row's selection is ignored when counting it. That is why selecting
+   *  "Leapers" leaves the other family counts meaningful instead of zeroed.
+   * ============================================================ */
+  const famChips = Array.from(document.querySelectorAll('.chip[data-fam]'));
+  const oriChips = Array.from(document.querySelectorAll('.chip[data-ori]'));
+  const gridEl = document.getElementById('grid');
+  const emptyEl = document.getElementById('empty');
+
+  const famSel = new Set();   // empty === no family filter, i.e. show all
+  const oriSel = new Set();
+
+  const matchFam = c => famSel.size === 0 || famSel.has(c.piece.family);
+  const matchOri = c => oriSel.size === 0 || oriSel.has(c.piece._bucket);
+
+  function apply() {
+    let shown = 0;
+    for (const c of CARDS) {
+      const vis = matchFam(c) && matchOri(c);
+      c.el.hidden = !vis;
+      if (vis) shown++;
+    }
+    emptyEl.hidden = shown > 0;
+    gridEl.hidden = shown === 0;
+
+    // family counts ignore famSel; origin counts ignore oriSel
+    const famBase = CARDS.filter(matchOri);
+    const oriBase = CARDS.filter(matchFam);
+    for (const chip of famChips) {
+      const v = chip.dataset.fam;
+      const n = famBase.filter(c => c.piece.family === v).length;
+      chip.querySelector('.chip-n').textContent = n;
+      // never disable a chip that is ON, or it cannot be switched back off
+      chip.disabled = n === 0 && !famSel.has(v);
+      chip.setAttribute('aria-pressed', String(famSel.has(v)));
+    }
+    for (const chip of oriChips) {
+      const v = chip.dataset.ori;
+      const n = oriBase.filter(c => c.piece._bucket === v).length;
+      chip.querySelector('.chip-n').textContent = n;
+      chip.disabled = n === 0 && !oriSel.has(v);
+      chip.setAttribute('aria-pressed', String(oriSel.has(v)));
+    }
+
+    // the panel is usually shut, so the button carries the active count
+    const active = famSel.size + oriSel.size;
+    filt.querySelector('.n').textContent = active ? String(active) : '';
+    filt.setAttribute('aria-label', active
+      ? `Filters, ${active} active` : 'Filters');
+  }
+
+  function toggle(set, v) { set.has(v) ? set.delete(v) : set.add(v); }
+
+  /* ---- Collapsible filter panel, same shell and motion as the deck pages.
+       The rows are kept painted at their open width for the whole move, or
+       they would re-wrap on every frame as the frame resizes. ---- */
+  const barEl = document.querySelector('.bar');
+  const fbox = document.querySelector('.fbox');
+  const filt = document.querySelector('.filt');
+  const rowsEl = document.getElementById('enc-chips');
+
+  function setOpen(open) {
+    const from = fbox.getBoundingClientRect();
+    let rowsW = open ? 0 : rowsEl.getBoundingClientRect().width;
+    filt.setAttribute('aria-expanded', String(open));
+    rowsEl.hidden = !open;
+    const to = fbox.getBoundingClientRect();
+    if (open) rowsW = rowsEl.getBoundingClientRect().width;
+    if (matchMedia('(prefers-reduced-motion:reduce)').matches) return;
+
+    rowsEl.hidden = false;
+    rowsEl.style.width = rowsW + 'px';
+    barEl.style.height = barEl.getBoundingClientRect().height + 'px';
+    fbox.classList.add('sizing');
+    fbox.animate(
+      [{ width: `${from.width}px`, height: `${from.height}px` },
+       { width: `${to.width}px`,   height: `${to.height}px` }],
+      { duration: 320, easing: 'cubic-bezier(.22,1,.36,1)' }
+    ).finished.then(() => {
+      rowsEl.style.width = '';
+      rowsEl.hidden = !open;
+      barEl.style.height = '';
+      fbox.classList.remove('sizing');
+    }).catch(() => {});
+  }
+  filt.addEventListener('click', () => setOpen(filt.getAttribute('aria-expanded') !== 'true'));
+
+  for (const chip of famChips) {
+    chip.addEventListener('click', () => { toggle(famSel, chip.dataset.fam); apply(); });
+  }
+  for (const chip of oriChips) {
+    chip.addEventListener('click', () => { toggle(oriSel, chip.dataset.ori); apply(); });
+  }
+
+  // Keep the old deep links working: #tab-leapers / #tab-origin-shogi.
+  const hash = location.hash.slice(1);
+  if (hash.startsWith('tab-origin-')) oriSel.add(hash.replace('tab-origin-', ''));
+  else if (hash.startsWith('tab-') && hash !== 'tab-all') famSel.add(hash.replace('tab-', ''));
+
+  apply();
+
+  </script>
+  <!-- Shared theme JS (cached across pages). See ../assets/theme.js. -->
+  <script src="../assets/nav.js"></script>
+  <script src="../assets/theme.js"></script>
+</body>
+</html>

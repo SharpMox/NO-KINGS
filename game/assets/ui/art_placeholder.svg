@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 360" width="360" height="360">
+  <!-- NO-17: the stand-in for catalog art that does not exist yet. One asset for
+       every kind (artefact, box, anything the Shop can stock), at the same 360x360
+       as the painted artefact art, so a tile is the same size whether or not the
+       art has landed. Deliberately reads as "pending" rather than as a broken
+       image: a filled rounded square in the deck's own surface grey, with the
+       catalog's ◈ drawn as an outline rather than a solid mark. -->
+  <rect x="16" y="16" width="328" height="328" rx="44" ry="44"
+        fill="#2b2b30" stroke="#4a4a52" stroke-width="8"/>
+  <path d="M180 108 L246 180 L180 252 L114 180 Z"
+        fill="none" stroke="#6b6b76" stroke-width="12"
+        stroke-linejoin="round"/>
+</svg>

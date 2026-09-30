@@ -1,0 +1,234 @@
+/* ============================================================
+ *  site.css — shared baseline used by every NO-KINGS page.
+ *  Contains the palette (light + dark), base typography, the
+ *  sticky site navigation, the theme toggle and the footer.
+ *
+ *  Page-specific styles (card grids, fusion/inversion tables,
+ *  betza sandbox, etc.) stay inline on each page so the live
+ *  page can be edited without round-tripping through this file.
+ * ============================================================ */
+
+/* ============== Theme ============== */
+/* Palette sampled from the game's own art, matching artefacts.html:
+     Larry     deep violet #201038 · rim #5020b8 · lavender #a070e8 · grin lime #a8d048
+     the board cream #fcf0d8 · violet #606084
+   Variable NAMES are unchanged, so every existing page picks this up with no
+   markup edits.
+
+   Light values follow the design pilots (artefacts.html, codex.html), so a
+   token reads the same on every page. Two deliberate deviations from the raw
+   source colours:
+   - --lime is a DARKER olive than the brand's #6f9420, which lands at 3.01:1
+     on this cream. --accent (every link, the focus ring) is the same token.
+   - --sq-dark is a lightened violet, NOT the board's #606084. On the real board
+     colour every movement marker collapses to ~1.2:1 and the piece disc to
+     2.78:1, which would make the diagrams unreadable. This value beats the old
+     grey on every marker and on the disc. */
+:root {
+  --bg: #f4ecda;
+  --surface: #fcf0d8;
+  --text: #231544;
+  --text-soft: #5f5080;
+  --border: #e0d0ae;
+  --shadow: 0 1px 3px rgba(35,21,68,0.07), 0 8px 24px rgba(35,21,68,0.06);
+  --sq-light: #fcf0d8;
+  --sq-dark: #b3a8c2;
+  --piece-disc: #231544;
+  --piece-disc-text: #fcf0d8;
+  --move-color: #2e6fd0;
+  --capture-color: #c0392b;
+  --hurdle-color: #7a3ae8;
+  --hop-target: #2f8f5f;
+  --ray-color: var(--move-color);
+  --rider-color: #c8791f;
+  --lime: #577319;
+  --accent: var(--lime);
+  --dark-ink: #141024;   /* text on a lime fill, both themes */
+  --violet: #6a2ed0;
+  --violet-hi: #8a52d8;
+  /* Glass: the wash under the lavender tint, the lit rim, the dialog scrim.
+     Light deliberately uses the same dark violet wash as dark theme (Max's
+     preference, 26/09/2026) rather than a cream variant. */
+  --glass-wash: #181030;
+  --glass-rim: #efeaff;
+  --scrim: #080412;
+  /* Shared with artefacts.html so assets/nav.css can style one header for both. */
+  --border-soft: #ebdcbf;
+  --text-dim: #6f6484;
+  --wrap: 1560px;   /* one centred-column width for the whole site */
+  /* Shared with the redesigned pages, which define these locally. Theme-neutral,
+     so they live once here rather than in each page that links this file. */
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --rad-xs: 4px;
+  --rad-ctl: 8px;
+  --rad-sm: 12px;
+  --rad-pill: 999px;
+  --ease: cubic-bezier(.22, 1, .36, 1);
+}
+
+[data-theme="dark"] {
+  --bg: #0f0a1c;
+  --surface: #181030;
+  --text: #efeaff;
+  --text-soft: #a79ac9;
+  --border: #332352;
+  --shadow: 0 1px 3px rgba(0,0,0,0.5), 0 8px 24px rgba(0,0,0,0.4);
+  --sq-light: #4a4270;
+  --sq-dark: #241d3e;
+  --piece-disc: #efeaff;
+  --piece-disc-text: #0f0a1c;
+  --move-color: #79a7ff;
+  --capture-color: #ff7878;
+  --hurdle-color: #c890e8;
+  --hop-target: #6dd6a8;
+  --rider-color: #ffae5c;
+  --lime: #a8d048;
+  --violet: #7a3ae8;
+  --violet-hi: #a070e8;
+  --glass-wash: #181030;
+  --glass-rim: #efeaff;
+  --scrim: #080412;
+  --border-soft: #261a44;
+  --text-dim: #8c81a9;
+}
+
+/* ============== Base ============== */
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.55;
+  transition: background 0.2s ease, color 0.2s ease;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--accent); }
+a:hover { text-decoration: underline; }
+
+/* Site nav lives in assets/nav.css + assets/nav.js (one definition, all pages). */
+
+/* ============== Page hero (shared across every page) ==============
+   `header h1` is two element selectors, so it outranks each page's inline
+   `h1 { font-size: 32px }` and its `@media` `h1 { font-size: 26px }` on
+   specificity alone. That means no page's own CSS needs editing, and it works
+   on fusion/inversion too, where site.css happens to load BEFORE the inline
+   block. The only markup change per page is wrapping the title in <em>. */
+header h1 {
+  margin: 0 0 12px 0;
+  font-size: clamp(44px, 7.4vw, 88px);
+  line-height: 0.95;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+}
+header h1 em {
+  font-style: italic;
+  background: linear-gradient(96deg, var(--lime) 0%, var(--violet-hi) 92%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  /* background-clip:text crops to the element box and the italic slant pushes
+     the final glyph past it. Reserve a sliver so trailing letters keep their tails. */
+  padding-right: 0.07em;
+}
+
+/* ============== Footer ============== */
+footer {
+  max-width: var(--wrap);
+  margin: 0 auto;
+  padding: 32px 22px 48px;
+  color: var(--text-soft);
+  font-size: 13px;
+  border-top: 1px solid var(--border);
+}
+footer p { margin: 0 0 8px 0; }
+footer p:last-child { margin-bottom: 0; }
+.footer-page-line { color: var(--text); font-size: 14px; }
+
+/* ============== A11y (shared across every page) ============== */
+/* Screen-reader-only utility for visually-hidden labels. */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+/* Visible keyboard-focus ring. Pointer focus stays UA-default to preserve visual identity. */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: var(--rad-sm); }
+/* Honour user motion preferences. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
+
+/* ============== Mobile (phones) ==============
+   Phone-only refinements. Everything here is gated behind the 560px phone
+   breakpoint (the one codex/encyclopedia already use), so desktop rendering is
+   completely untouched. Rules target the control class names shared across
+   pages; site.css loads after each page's inline <style>, so these win. */
+/* The "swipe to explore" hint is hidden by default; the phone block shows it.
+   Declared before the @media so source order lets the mobile rule win. */
+.mobile-hint { display: none; }
+@media (max-width: 560px) {
+
+  /* Standalone controls / chips / pills shared across pages → ≥44px targets. */
+  .tab-btn,
+  .toggle-chip,
+  .legend-chip,
+  .evolution-link,
+  .back-link,
+  .view-btn,
+  .sandbox-key,
+  .sandbox-preset {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+  .filter-input { min-height: 44px; }
+  /* Chip-style links/pills that are their own line item. */
+  a.betza-chip,
+  .badge {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+  /* mini-betza is the label under a card — make it span the card (a big
+     horizontal target) with a 44px-tall centred box. Scoped to .mini-card so
+     it outranks the pages' inline `a.mini-betza{display:block}` even on
+     fusion/inversion, where site.css happens to load before the inline CSS. */
+  .mini-card a.mini-betza {
+    display: flex;
+    width: 100%;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+  }
+  /* Clickable notation tokens in the betza reference, and codex's relation
+     "+N more" toggles. */
+  .betza-table code[role="button"] {
+    display: inline-flex;
+    min-height: 44px;
+    min-width: 44px;
+    align-items: center;
+    justify-content: center;
+  }
+  .relation-toggle { min-height: 44px; }
+
+  /* Compact footer on phones. With the companion-pages line gone, the only
+     footer links left are inline prose (Wikipedia sources) — keep them inline
+     (a 44px-tall box would wreck the paragraph) and lean on roomier line
+     spacing for the hit area. */
+  footer { padding: 20px 16px 28px; font-size: 12px; }
+  footer p { margin: 0 0 6px 0; line-height: 1.7; }
+  .footer-page-line { font-size: 12.5px; }
+  /* Inline prose links keep a comfortable hit area via line spacing. */
+  .intro { line-height: 1.7; }
+  .intro a, footer p a { padding: 2px 0; }
+
+  /* Horizontal-scroll wrapper for wide tables (shared name with fusion.html). */
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* "swipe to explore" affordance for horizontally-scrollable widgets. */
+  .mobile-hint {
+    display: block;
+    font-size: 12px;
+    color: var(--text-soft);
+    margin: 0 0 6px 0;
+    text-align: center;
+  }
+}

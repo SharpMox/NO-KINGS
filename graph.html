@@ -1,0 +1,1431 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Three views on the NO-KINGS codex pieces: flat reference table, merge/fusion matrix, and force-directed relationship graph.">
+  <title>NO KINGS / Graph</title>
+  <style>
+    /* ============================================================
+     *  Page-local CSS. Theme palette, nav, footer come from assets/site.css.
+     * ============================================================ */
+    header {
+      max-width: var(--wrap);
+      margin: 0 auto;
+      padding: 32px 22px 16px;
+    }
+    h1 {
+      margin: 0 0 8px 0;
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    .intro {
+      color: var(--text-soft);
+      max-width: 760px;
+      margin: 0 0 16px 0;
+      font-size: 15px;
+    }
+    main {
+      max-width: none;
+      margin: 0 auto;
+      padding: 0 10px 48px;
+    }
+    section[role="tabpanel"] { display: none; }
+    section[role="tabpanel"].active { display: block; }
+
+    /* ============================================================
+     *  Tabs (reuse fusion.html's tabs pattern).
+     * ============================================================ */
+    .tabs {
+      display: inline-flex;
+      gap: 2px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--rad-ctl);
+      padding: 4px;
+    }
+    .tab-btn {
+      appearance: none;
+      background: transparent;
+      border: 0;
+      padding: 8px 16px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-soft);
+      cursor: pointer;
+      border-radius: var(--rad-ctl);
+      font-family: inherit;
+      transition: color 0.15s ease, background 0.15s ease;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn[aria-selected="true"] {
+      background: var(--bg);
+      color: var(--text);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+    }
+    .tab-count {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 1px 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-soft);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--rad-ctl);
+      line-height: 1.4;
+    }
+    .tab-btn[aria-selected="true"] .tab-count {
+      background: var(--surface);
+      color: var(--text);
+    }
+
+    /* ============================================================
+     *  Shared controls (filter input, legend chips)
+     * ============================================================ */
+    .controls {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .filter-input {
+      appearance: none;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--rad-ctl);
+      padding: 8px 12px;
+      font-size: 14px;
+      color: var(--text);
+      width: 240px;
+      font-family: inherit;
+    }
+    .filter-input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .legend { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; font-size: 12px; color: var(--text-soft); }
+    .legend-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 10px;
+      border-radius: var(--rad-pill);
+      border: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .legend-chip::before {
+      content: '';
+      display: inline-block;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      border: 1px solid currentColor;
+    }
+    .legend-chip.is-promotion::before    { background: color-mix(in srgb, var(--hop-target) 60%, transparent); color: var(--hop-target); }
+    .legend-chip.is-additive::before     { background: color-mix(in srgb, var(--accent) 60%, transparent); color: var(--accent); }
+    .legend-chip.is-synergistic::before  { background: color-mix(in srgb, var(--hurdle-color) 60%, transparent); color: var(--hurdle-color); }
+    .legend-chip.is-inversion::before    { background: color-mix(in srgb, var(--text-soft) 50%, transparent); color: var(--text-soft); }
+
+    /* Toggle chips (for the Graph tab edge-kind filters). */
+    .toggle-chip {
+      appearance: none;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 12px;
+      color: var(--text);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 10px;
+      border-radius: var(--rad-pill);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+    }
+    .toggle-chip[aria-pressed="false"] { opacity: 0.7; }
+    .toggle-chip::before {
+      content: '';
+      display: inline-block;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      border: 1px solid currentColor;
+    }
+    .toggle-chip.is-promotion::before    { background: color-mix(in srgb, var(--hop-target) 60%, transparent); color: var(--hop-target); }
+    .toggle-chip.is-additive::before,
+    .toggle-chip.is-fuse-with::before    { background: color-mix(in srgb, var(--accent) 60%, transparent); color: var(--accent); }
+    .toggle-chip.is-synergistic::before,
+    .toggle-chip.is-fuse-into::before    { background: color-mix(in srgb, var(--hurdle-color) 60%, transparent); color: var(--hurdle-color); }
+    .toggle-chip.is-fusion::before {
+      background: linear-gradient(135deg,
+        color-mix(in srgb, var(--accent)       70%, transparent) 0% 49%,
+        color-mix(in srgb, var(--hurdle-color) 70%, transparent) 51% 100%);
+      color: var(--accent);
+    }
+    .toggle-chip.is-inversion::before    { background: color-mix(in srgb, var(--text-soft) 50%, transparent); color: var(--text-soft); }
+    .toggle-chip.is-all::before          { display: none; }
+
+    /* ============================================================
+     *  Tab 1: Matrix — existing 29x29 grid.
+     * ============================================================ */
+    #graph-wrap {
+      display: flex;
+      overflow-x: auto;
+      overflow-y: visible;
+      border: 1px solid var(--border);
+      border-radius: var(--rad-ctl);
+      background: var(--surface);
+    }
+    table.graph-grid {
+      border-collapse: separate;
+      border-spacing: 0;
+      /* Centres the grid in both axes when the wrap is roomier than the table
+         (231px of dead space sat to its right at 1440px+).
+         `margin:auto` rather than justify/align-content on the flex parent:
+         centring a flex container's overflowing content makes the leading edge
+         unreachable, because you cannot scroll to a negative offset. An auto
+         margin resolves to 0 the moment the table is wider than the wrap, so
+         narrow viewports still start hard against the left and pan normally. */
+      margin: auto;
+    }
+    .graph-grid td {
+      padding: 0;
+      border: 1px solid var(--border);
+      box-sizing: border-box;
+      vertical-align: middle;
+      text-align: center;
+      background: var(--surface);
+      width: 40px; height: 40px; min-width: 40px; max-width: 40px;
+    }
+    .graph-grid th {
+      padding: 0;
+      box-sizing: border-box;
+      vertical-align: middle;
+      text-align: center;
+      background: var(--bg);
+    }
+    .graph-grid th.col-header {
+      width: 40px; min-width: 40px; max-width: 40px;
+      height: 140px;
+      vertical-align: bottom;
+      padding: 0;
+      background: var(--surface);
+    }
+    .graph-grid th.row-header {
+      width: 40px; min-width: 40px; max-width: 40px;
+      padding: 0;
+      position: sticky; left: 0; z-index: 1;
+      background: var(--surface);
+    }
+    .graph-grid th.corner {
+      position: sticky; left: 0;
+      z-index: 40;
+      height: 140px;
+      background: var(--surface);
+    }
+    .graph-grid th.col-header { overflow: visible; }
+    /* Fixed-track grid: board in the bottom 40px row, label sits on top of
+       it (6px up, 14px in — the old bottom:46/left:14 as margins). The 40px
+       column is fixed, so the nowrap label overflows it instead of
+       inflating it. */
+    .col-header-inner {
+      display: grid;
+      grid-template-rows: 1fr 40px;
+      grid-template-columns: 40px;
+      width: 40px;
+      height: 140px;
+      overflow: visible;
+    }
+    .col-header-label {
+      grid-area: 1 / 1;
+      align-self: end; justify-self: start;
+      margin: 0 0 6px 14px;
+      transform-origin: 0 100%;
+      transform: rotate(-45deg);
+      font-size: 11px;
+      white-space: nowrap;
+      line-height: 1.1;
+      color: var(--text);
+      pointer-events: none;
+    }
+    .col-board, .row-board {
+      display: block; width: 40px; height: 40px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      box-sizing: border-box;
+    }
+    .col-board { grid-area: 2 / 1; }
+    .graph-grid td .cell-board {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    .graph-grid th svg, .graph-grid td svg { display: block; width: 100%; height: 100%; }
+    .graph-grid td.is-filled { cursor: pointer; }
+    /* Inset outline instead of an absolutely-positioned ::after overlay:
+       outlines paint above content and never affect layout. */
+    .graph-grid td.is-promotion,
+    .graph-grid td.is-additive,
+    .graph-grid td.is-synergistic { outline: 1px solid transparent; outline-offset: -1px; }
+    .graph-grid td.is-promotion   { outline-color: color-mix(in srgb, var(--hop-target)   65%, transparent); }
+    .graph-grid td.is-additive    { outline-color: color-mix(in srgb, var(--accent)       65%, transparent); }
+    .graph-grid td.is-synergistic { outline-color: color-mix(in srgb, var(--hurdle-color) 65%, transparent); }
+    .graph-grid td.is-row-stripe,
+    .graph-grid td.is-col-stripe {
+      background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+    }
+    .graph-grid td.is-row-stripe.is-col-stripe {
+      background: color-mix(in srgb, var(--accent) 18%, var(--surface));
+    }
+    .graph-grid th.row-header.is-hover {
+      background: color-mix(in srgb, var(--accent) 18%, var(--bg));
+    }
+    .graph-grid th.row-header.is-hover .row-board,
+    .graph-grid th.col-header.is-hover .col-board {
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+    }
+    .graph-grid tr.is-filtered-out, .graph-grid col.is-filtered-out,
+    .graph-grid th.is-filtered-out, .graph-grid td.is-filtered-out { display: none; }
+
+    /* ============================================================
+     *  Matrix tooltip
+     * ============================================================ */
+    #graph-tooltip {
+      position: fixed;
+      z-index: 1000;
+      pointer-events: none;
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: var(--rad-ctl);
+      padding: 12px;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.18);
+      max-width: 280px;
+      font-size: 13px;
+      color: var(--text);
+    }
+    #graph-tooltip[hidden] { display: none; }
+    #graph-tooltip.is-promotion   { border-color: var(--hop-target); }
+    #graph-tooltip.is-additive    { border-color: var(--accent); }
+    #graph-tooltip.is-synergistic { border-color: var(--hurdle-color); }
+    .tt-inputs { display: flex; align-items: center; justify-content: center; gap: 10px; }
+    .tt-input  { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .tt-input-board { width: 72px; height: 72px; }
+    .tt-input-board svg { width: 100%; height: 100%; display: block; }
+    .tt-input-name { font-size: 11px; color: var(--text); text-align: center; line-height: 1.15; }
+    .tt-plus { font-size: 22px; color: var(--text-soft); font-weight: 300; line-height: 1; }
+    .tt-divider { height: 1px; background: var(--border); margin: 10px 0; }
+    .tt-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .tt-name { font-weight: 600; font-size: 14px; }
+    .tt-badge { padding: 1px 8px; border-radius: var(--rad-pill); font-size: 10.5px; border: 1px solid currentColor; text-transform: uppercase; letter-spacing: 0.4px; }
+    .tt-badge.is-promotion   { color: var(--hop-target); }
+    .tt-badge.is-additive    { color: var(--accent); }
+    .tt-badge.is-synergistic { color: var(--hurdle-color); }
+    .tt-board { width: 200px; height: 200px; margin: 4px 0; }
+    .tt-board svg { width: 100%; height: 100%; display: block; }
+    .tt-betza { font-family: var(--mono); font-size: 12px; color: var(--text-soft); }
+
+    /* ============================================================
+     *  Tab 3: Graph — force-directed network.
+     * ============================================================ */
+    #network-wrap {
+      border: 1px solid var(--border);
+      border-radius: var(--rad-ctl);
+      background: var(--surface);
+      overflow: hidden;
+      position: relative;
+    }
+    #network-svg {
+      display: block;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      height: auto;
+      touch-action: none;
+    }
+    /* Phones: the network would squish into an unreadable square at viewport
+       width, so render it at a usable fixed size inside a horizontal-scroll
+       container and let the reader swipe to pan. The matrix's #graph-wrap
+       already scrolls (overflow-x:auto). Desktop (>560px) is untouched. */
+    @media (max-width: 560px) {
+      #network-wrap { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
+      /* Render the graph large on phones (1000² square) so nodes + labels read
+         clearly; the container scrolls horizontally to pan. */
+      #network-svg { min-width: 1200px; touch-action: auto; }
+    }
+    .net-edge {
+      stroke-width: 1.5;
+      fill: none;
+      pointer-events: none;       /* edges sit above cards; keep clicks on nodes */
+      transition: opacity 0.15s ease;
+    }
+    .net-edge.is-promotion   { stroke: color-mix(in srgb, var(--hop-target) 70%, transparent); }
+    .net-edge.is-fuse-with   { stroke: color-mix(in srgb, var(--accent) 70%, transparent); }
+    .net-edge.is-fuse-into   { stroke: color-mix(in srgb, var(--hurdle-color) 70%, transparent); }
+    .net-edge.is-inversion   { stroke: color-mix(in srgb, var(--text-soft) 70%, transparent); stroke-dasharray: 4 3; }
+    .net-node {
+      cursor: pointer;
+      transition: opacity 0.15s ease;
+    }
+    .net-node:focus { outline: none; }
+    .net-node:focus-visible { outline: none; }
+    .net-node:focus-visible .net-node-bg { stroke: var(--accent); stroke-width: 2.5px; }
+    .net-node.is-pinned .net-node-bg { stroke: var(--accent); }
+    .net-node-bg {
+      fill: var(--surface);
+      stroke: var(--text-soft);
+      stroke-width: 1.5;
+    }
+    .net-node-label {
+      font-size: 10.5px;
+      font-weight: 500;
+      fill: var(--text);
+      text-anchor: middle;
+      pointer-events: none;
+    }
+    .net-node-board { pointer-events: none; }
+    .is-faded { opacity: 0.18 !important; }
+    .net-edge.is-hidden { display: none; }
+    /* Graph tooltip — simpler than the matrix one. */
+    #network-tooltip {
+      position: fixed;
+      z-index: 1000;
+      pointer-events: none;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--rad-ctl);
+      padding: 10px 12px;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.18);
+      max-width: 320px;
+      font-size: 12.5px;
+      color: var(--text);
+    }
+    #network-tooltip[hidden] { display: none; }
+    .nt-name { font-weight: 600; font-size: 13.5px; margin-bottom: 4px; }
+    .nt-meta { color: var(--text-soft); font-size: 11.5px; }
+    .nt-betza { font-family: var(--mono); font-size: 11.5px; color: var(--text); margin-top: 4px; }
+    .nt-relations { margin-top: 6px; }
+    .nt-rel-head {
+      font-size: 10px; font-weight: 700; color: var(--text-soft);
+      text-transform: uppercase; letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    /* Row: [verb conn] [arrow] [pieces] flowing inline — the arrow sits right
+       after each label (no fixed columns, so arrows are not aligned). */
+    .nt-rel { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: 11.5px; margin: 3px 0; }
+    .nt-rel-label { white-space: nowrap; }
+    .nt-rel-verb { font-weight: 600; text-transform: capitalize; }   /* "Promote" / "Fuses" / "Fused" / "Inverts" */
+    .nt-rel-conn { color: var(--text-soft); }                 /* "from" / "to" / "with" — grey */
+    .nt-rel-arrow { color: var(--text-soft); font-weight: 600; line-height: 1; font-size: 1.15em; }   /* relation glyph, enlarged */
+    .nt-rel-sep { color: var(--text-soft); padding: 0 3px; font-size: 1.15em; }  /* "→" / "+" between pieces — grey, enlarged to match */
+    .nt-rel-sep.is-plus { font-size: 1.5em; line-height: 1; }  /* "+" draws smaller than the arrow glyphs, so size it up to match */
+    .nt-rel-piece { white-space: nowrap; }
+    /* Verb + piece names take the relation colour. */
+    .nt-rel.is-promotion .nt-rel-verb,
+    .nt-rel.is-promotion .nt-rel-piece { color: var(--hop-target); }
+    .nt-rel.is-fusion .nt-rel-verb,
+    .nt-rel.is-fusion .nt-rel-piece { color: var(--accent); }
+    /* Inversion verb + piece use the normal text colour (white in dark mode). */
+    .nt-rel.is-inversion .nt-rel-verb,
+    .nt-rel.is-inversion .nt-rel-piece { color: var(--text); }
+    /* The resulting piece of a "fuses with" line is purple (fuse-into colour). */
+    .nt-rel.is-fusion .nt-rel-piece.is-output { color: var(--hurdle-color); }
+
+    @media (max-width: 720px) {
+      h1 { font-size: 24px; }
+      .filter-input { width: 100%; }
+      .controls { gap: 8px; }
+    }
+
+    /* Fullscreen: the whole tab section goes fullscreen (button stays in the
+       controls row, filter chips stay usable, scrollers can't swallow it). */
+    .fs-btn {
+      margin-left: auto;
+      width: 28px; height: 23px; border-radius: var(--rad-ctl);  /* chip-height: keeps the controls row from growing */
+      border: 1px solid var(--border); background: var(--surface); color: var(--text);
+      font-size: 13px; line-height: 1; cursor: pointer;
+    }
+    .fs-btn:hover { background: var(--bg); }
+    section[role="tabpanel"]:fullscreen {
+      background: var(--bg);
+      overflow: auto;
+      padding: 16px 24px;
+      /* some Android browsers don't stretch the fullscreen element themselves */
+      width: 100%; height: 100%; box-sizing: border-box;
+    }
+    /* Give the matrix wrap the fullscreen height so its `margin:auto` has room
+       to centre vertically; without a height it just hugs the table and the
+       vertical half of the centring can never apply. */
+    #tab-matrix:fullscreen #graph-wrap { height: calc(100dvh - 96px); }
+    #tab-matrix.fake-fs #graph-wrap { height: calc(100dvh - 96px); }
+    /* Fit the square graph to the fullscreen viewport, centred. */
+    #tab-graph:fullscreen #network-svg {
+      width: auto; height: min(100vw, calc(100dvh - 90px));
+      margin: 0 auto;
+    }
+    /* Fake fullscreen for iPhones: WebKit has no element-fullscreen API, so
+       the section pins to the viewport instead. Kept as separate rules — a
+       selector list with :fullscreen would be dropped whole by old parsers. */
+    section[role="tabpanel"].fake-fs {
+      position: fixed; inset: 0; z-index: 100;
+      background: var(--bg);
+      overflow: auto;
+      padding: 16px 24px;
+    }
+    #tab-graph.fake-fs #network-svg {
+      width: auto; height: min(100vw, calc(100dvh - 90px));
+      margin: 0 auto;
+    }
+    /* Phones: in (fake or real) fullscreen keep the full-density swipe-pan —
+       the fit-to-viewport rules above would letterbox the ring tiny. Last so
+       they win the cascade; separate rules so old parsers can't drop both. */
+    @media (max-width: 560px) {
+      #tab-graph:fullscreen #network-svg { width: 100%; height: auto; }
+      #tab-graph.fake-fs #network-svg { width: 100%; height: auto; }
+    }
+
+    /* Shared a11y (.sr-only, :focus-visible, reduced-motion) lives in assets/site.css. */
+  </style>
+  <link rel="stylesheet" href="assets/site.css">
+  <link rel="stylesheet" href="assets/nav.css">
+  <script src="assets/theme-init.js"></script>
+  <script src="assets/board.js"></script>
+  <script src="data/pieces-codex.js"></script>
+  <script src="data/promotions.js"></script>
+  <script src="data/fusions.js"></script>
+  <script src="data/inversions.js"></script>
+</head>
+<body>
+  <div id="site-nav" data-page="graph"></div>
+
+  <header>
+    <h1><em>Graph</em></h1>
+    <p class="intro">Two views on the codex pieces — the merge/fusion matrix and a force-directed network of every relationship.</p>
+    <div class="tabs" role="tablist" aria-label="Graph view">
+      <button class="tab-btn" role="tab" aria-selected="true"  aria-controls="tab-graph"  id="tabbtn-graph">Graph</button>
+      <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-matrix" id="tabbtn-matrix">Matrix</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- =========== Tab 1: Matrix =========== -->
+    <section role="tabpanel" id="tab-matrix" aria-labelledby="tabbtn-matrix">
+      <div class="controls">
+        <input type="search" id="matrix-filter" class="filter-input" placeholder="Filter rows…" aria-label="Filter rows by piece name">
+        <div class="legend" aria-label="Cell type legend">
+          <span class="legend-chip is-promotion">Promotion</span>
+          <span class="legend-chip is-additive">Additive fusion</span>
+          <span class="legend-chip is-synergistic">Synergistic fusion</span>
+        </div>
+        <button type="button" class="fs-btn" title="Fullscreen" aria-label="Fullscreen">⛶</button>
+      </div>
+      <p class="mobile-hint" aria-hidden="true">← swipe to explore →</p>
+      <div id="graph-wrap">
+        <table id="graph-table" class="graph-grid" role="grid" aria-label="Merge and fusion matrix"></table>
+      </div>
+    </section>
+
+    <!-- =========== Tab 3: Graph =========== -->
+    <section role="tabpanel" id="tab-graph" aria-labelledby="tabbtn-graph" class="active">
+      <div class="controls" role="group" aria-label="Edge type filters — All is exclusive; Fusion/Promotion/Inversion can be toggled independently">
+        <button type="button" class="toggle-chip is-all"        data-kind="all"        aria-pressed="true">All</button>
+        <button type="button" class="toggle-chip is-fusion"     data-kind="fusion"     aria-pressed="false">Fusion</button>
+        <button type="button" class="toggle-chip is-promotion"  data-kind="promotion"  aria-pressed="false">Promotion</button>
+        <button type="button" class="toggle-chip is-inversion"  data-kind="inversion"  aria-pressed="false">Inversion</button>
+        <button type="button" class="fs-btn" title="Fullscreen" aria-label="Fullscreen">⛶</button>
+      </div>
+      <p class="mobile-hint" aria-hidden="true">← swipe to explore →</p>
+      <div id="network-wrap">
+        <svg id="network-svg" xmlns="http://www.w3.org/2000/svg" aria-label="Force-directed network of piece relationships"></svg>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p class="footer-page-line">Visual Graphs of the Promotions, Fusions &amp; Inversions relations of all the Codex pieces</p>
+    <p>Sourced from the <a href="https://en.wikipedia.org/wiki/List_of_fairy_chess_pieces" target="_blank" rel="noopener">Wikipedia piece list</a> and <a href="https://en.wikipedia.org/wiki/Fairy_chess_piece" target="_blank" rel="noopener">Betza's notation</a>. Built as a single static HTML file — no servers, no frameworks.</p>
+  </footer>
+
+  <script>
+  /* ============================================================
+   *  Shared data + lookup maps
+   * ============================================================ */
+  const VOID_IDS = new Set(['berolina','inv-sergeant','inv-arrow-pawn','inv-kirin-plus','inv-kirin-plus-plus']);
+  // Output-only pieces (never a fusion input) are dropped from the matrix axes.
+  // Lich + Djinn are now inputs (Lich + Djinn = Valkyrie), so they stay.
+  const RESULT_ONLY_IDS = new Set(['godzilla','amazonrider']);
+  const ALL_PIECES = PIECES_CODEX.filter(p => !VOID_IDS.has(p.id));      // 33 non-Void for Matrix tab
+  const ALL_PIECES_INCL_VOID = PIECES_CODEX;                              // 38 for Pieces + Graph tabs
+  const byId = new Map(ALL_PIECES_INCL_VOID.map(p => [p.id, p]));
+  // Matrix axes drop pieces that don't appear on a row/column with any interaction.
+  const PIECES = ALL_PIECES.filter(p => !RESULT_ONLY_IDS.has(p.id));     // 31 axis pieces
+
+  // Self-merge → next stage in its Family (if any).
+  const promotionMap = new Map();
+  for (const Family of PROMOTION_FAMILIES) {
+    for (let i = 0; i < Family.ids.length - 1; i++) {
+      promotionMap.set(Family.ids[i], Family.ids[i + 1]);
+    }
+  }
+  // Cross-merge → fusion lookup (symmetric, sorted key).
+  const fusionMap = new Map();
+  for (const kind of ['additive', 'synergistic']) {
+    for (const { lhs, rhs, out } of FUSIONS[kind]) {
+      fusionMap.set([lhs, rhs].sort().join('|'), { out, kind });
+    }
+  }
+  function cellFor(rowId, colId) {
+    if (rowId === colId) {
+      const next = promotionMap.get(rowId);
+      return next ? { result: next, kind: 'promotion' } : null;
+    }
+    const f = fusionMap.get([rowId, colId].sort().join('|'));
+    return f ? { result: f.out, kind: f.kind } : null;
+  }
+  // Shared rendering helpers.
+  function zoomedBoard(piece) {
+    return renderBoard(piece).replace('viewBox="0 0 324 324"', 'viewBox="72 72 180 180"');
+  }
+  function fullBoard(piece) { return renderBoard(piece); }
+  function escapeHtml(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+  /* ============================================================
+   *  Tabs
+   * ============================================================ */
+  const tabButtons = Array.from(document.querySelectorAll('.tab-btn'));
+  const panels     = Array.from(document.querySelectorAll('section[role="tabpanel"]'));
+  const built = { matrix: false, graph: false };
+  function activateTab(panelId) {
+    panels.forEach(p => p.classList.toggle('active', p.id === panelId));
+    tabButtons.forEach(b => b.setAttribute('aria-selected', b.getAttribute('aria-controls') === panelId ? 'true' : 'false'));
+    if (panelId === 'tab-matrix' && !built.matrix) { buildMatrixTab(); built.matrix = true; }
+    if (panelId === 'tab-graph'  && !built.graph)  { buildGraphTab();  built.graph  = true; }
+  }
+  tabButtons.forEach(btn => btn.addEventListener('click', () => activateTab(btn.getAttribute('aria-controls'))));
+  // Arrow-key tab cycling.
+  document.querySelector('[role="tablist"]').addEventListener('keydown', (ev) => {
+    if (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') return;
+    const idx = tabButtons.findIndex(b => b.getAttribute('aria-selected') === 'true');
+    const next = ev.key === 'ArrowRight' ? (idx + 1) % tabButtons.length : (idx - 1 + tabButtons.length) % tabButtons.length;
+    activateTab(tabButtons[next].getAttribute('aria-controls'));
+    tabButtons[next].focus();
+  });
+
+  /* ============================================================
+   *  Tab 1: Matrix (29x29) — built lazily.
+   * ============================================================ */
+  function buildMatrixTab() {
+    buildMatrixTable();
+    ensureMatrixTooltip();
+    wireMatrixHoverHighlight();
+    wireMatrixKeyboard();
+    wireMatrixFilter();
+  }
+  function buildMatrixTable() {
+    const table = document.getElementById('graph-table');
+    const colgroup = document.createElement('colgroup');
+    colgroup.appendChild(document.createElement('col'));
+    for (const p of PIECES) {
+      const col = document.createElement('col');
+      col.dataset.id = p.id;
+      colgroup.appendChild(col);
+    }
+    table.appendChild(colgroup);
+    const thead = document.createElement('thead');
+    const headRow = document.createElement('tr');
+    headRow.setAttribute('role', 'row');
+    const corner = document.createElement('th');
+    corner.className = 'corner';
+    corner.setAttribute('aria-label', 'row piece × column piece');
+    headRow.appendChild(corner);
+    for (let i = 0; i < PIECES.length; i++) {
+      const p = PIECES[i];
+      const th = document.createElement('th');
+      th.scope = 'col';
+      th.className = 'col-header';
+      th.dataset.id = p.id;
+      th.setAttribute('aria-label', p.name);
+      th.style.zIndex = String(PIECES.length - i + 1);
+      th.innerHTML =
+        '<div class="col-header-inner">' +
+          '<span class="col-header-label">' + escapeHtml(p.name) + '</span>' +
+          '<div class="col-board">' + zoomedBoard(p) + '</div>' +
+        '</div>';
+      headRow.appendChild(th);
+    }
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+    const tbody = document.createElement('tbody');
+    let firstGridCell = null;
+    for (const rowPiece of PIECES) {
+      const tr = document.createElement('tr');
+      tr.setAttribute('role', 'row');
+      tr.dataset.id = rowPiece.id;
+      const rowTh = document.createElement('th');
+      rowTh.scope = 'row';
+      rowTh.className = 'row-header';
+      rowTh.dataset.id = rowPiece.id;
+      rowTh.setAttribute('aria-label', rowPiece.name);
+      rowTh.innerHTML = '<div class="row-board">' + zoomedBoard(rowPiece) + '</div>';
+      tr.appendChild(rowTh);
+      for (const colPiece of PIECES) {
+        const td = document.createElement('td');
+        td.setAttribute('role', 'gridcell');
+        // Roving tabindex: only the first cell is in the Tab order; arrow keys
+        // move focus between cells (wired in wireMatrixKeyboard).
+        td.tabIndex = -1;
+        if (!firstGridCell) { td.tabIndex = 0; firstGridCell = td; }
+        td.dataset.row = rowPiece.id;
+        td.dataset.col = colPiece.id;
+        const cell = cellFor(rowPiece.id, colPiece.id);
+        if (cell) {
+          const resultPiece = byId.get(cell.result);
+          if (!resultPiece) {
+            td.className = 'is-empty';
+            td.setAttribute('aria-label', rowPiece.name + ' + ' + colPiece.name + ' = unknown');
+          } else {
+            td.className = 'is-filled is-' + cell.kind;
+            const label = rowPiece.name + ' + ' + colPiece.name + ' = ' + resultPiece.name + ' (' + cell.kind + ')';
+            td.setAttribute('aria-label', label);
+            td.innerHTML = '<div class="cell-board">' + zoomedBoard(resultPiece) + '</div>';
+          }
+        } else {
+          td.className = 'is-empty';
+          td.setAttribute('aria-label', rowPiece.name + ' + ' + colPiece.name + ' = no interaction');
+        }
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+  }
+  let hoveredRow = null, hoveredCol = null;
+  function clearMatrixHover() {
+    if (!hoveredRow && !hoveredCol) return;
+    const table = document.getElementById('graph-table');
+    table.querySelectorAll('td.is-row-stripe').forEach(td => td.classList.remove('is-row-stripe'));
+    table.querySelectorAll('td.is-col-stripe').forEach(td => td.classList.remove('is-col-stripe'));
+    table.querySelectorAll('th.is-hover').forEach(th => th.classList.remove('is-hover'));
+    hoveredRow = hoveredCol = null;
+  }
+  function applyMatrixHover(rowId, colId) {
+    const table = document.getElementById('graph-table');
+    if (rowId !== hoveredRow) {
+      table.querySelectorAll('td.is-row-stripe').forEach(td => td.classList.remove('is-row-stripe'));
+      const rowTh = table.querySelector('th.row-header.is-hover');
+      if (rowTh) rowTh.classList.remove('is-hover');
+      hoveredRow = rowId;
+      table.querySelectorAll('td[data-row="' + rowId + '"]').forEach(td => td.classList.add('is-row-stripe'));
+      const newRowTh = table.querySelector('th.row-header[data-id="' + rowId + '"]');
+      if (newRowTh) newRowTh.classList.add('is-hover');
+    }
+    if (colId !== hoveredCol) {
+      table.querySelectorAll('td.is-col-stripe').forEach(td => td.classList.remove('is-col-stripe'));
+      const colTh = table.querySelector('th.col-header.is-hover');
+      if (colTh) colTh.classList.remove('is-hover');
+      hoveredCol = colId;
+      table.querySelectorAll('td[data-col="' + colId + '"]').forEach(td => td.classList.add('is-col-stripe'));
+      const newColTh = table.querySelector('th.col-header[data-id="' + colId + '"]');
+      if (newColTh) newColTh.classList.add('is-hover');
+    }
+  }
+  function wireMatrixHoverHighlight() {
+    const table = document.getElementById('graph-table');
+    table.addEventListener('mousemove', (ev) => {
+      const td = ev.target.closest('td');
+      if (!td) return;
+      applyMatrixHover(td.dataset.row, td.dataset.col);
+      updateMatrixTooltip(td, ev);
+    });
+    table.addEventListener('mouseleave', () => {
+      clearMatrixHover();
+      hideMatrixTooltip();
+    });
+    table.addEventListener('click', (ev) => {
+      const td = ev.target.closest('td');
+      if (!td) return;
+      applyMatrixHover(td.dataset.row, td.dataset.col);
+      updateMatrixTooltip(td, ev);
+    });
+    document.addEventListener('click', (ev) => {
+      if (ev.target.closest('#graph-table')) return;
+      clearMatrixHover();
+      hideMatrixTooltip();
+    });
+    table.addEventListener('dblclick', (ev) => {
+      openMatrixTarget(ev.target.closest('td'), ev.target.closest('th'));
+    });
+  }
+  // Shared navigation used by both the matrix dblclick and keyboard activation.
+  function openMatrixTarget(td, th) {
+    let pieceId = null;
+    if (td && td.classList.contains('is-filled')) {
+      const cell = cellFor(td.dataset.row, td.dataset.col);
+      if (cell) pieceId = cell.result;
+    } else if (th && (th.classList.contains('col-header') || th.classList.contains('row-header'))) {
+      pieceId = th.dataset.id;
+    }
+    if (!pieceId) return;
+    const piece = byId.get(pieceId);
+    if (!piece) return;
+    window.open('codex.html?q=' + encodeURIComponent(piece.name), '_blank', 'noopener');
+  }
+  // Roving-tabindex keyboard navigation for the role="grid" matrix: arrow keys
+  // move focus between cells, Enter/Space opens the cell's piece in the codex.
+  function wireMatrixKeyboard() {
+    const table = document.getElementById('graph-table');
+    function cellAt(rowEl, colIdx) {
+      const cells = rowEl ? rowEl.querySelectorAll('td') : [];
+      return cells[colIdx] || null;
+    }
+    table.addEventListener('keydown', (ev) => {
+      const td = ev.target.closest && ev.target.closest('td');
+      if (!td) return;
+      if (ev.key === 'Enter' || ev.key === ' ' || ev.key === 'Spacebar') {
+        ev.preventDefault();
+        openMatrixTarget(td, null);
+        return;
+      }
+      const dirs = { ArrowRight: [0, 1], ArrowLeft: [0, -1], ArrowDown: [1, 0], ArrowUp: [-1, 0] };
+      const d = dirs[ev.key];
+      if (!d) return;
+      ev.preventDefault();
+      const tr = td.parentElement;
+      const rowCells = Array.from(tr.querySelectorAll('td'));
+      const colIdx = rowCells.indexOf(td);
+      const rows = Array.from(table.querySelectorAll('tbody tr'));
+      const rowIdx = rows.indexOf(tr);
+      const nRows = rows.length, nCols = rowCells.length;
+      if (!nRows || !nCols) return;
+      const nextRowIdx = Math.min(nRows - 1, Math.max(0, rowIdx + d[0]));
+      const nextColIdx = Math.min(nCols - 1, Math.max(0, colIdx + d[1]));
+      const next = cellAt(rows[nextRowIdx], nextColIdx);
+      if (!next || next === td) return;
+      td.tabIndex = -1;
+      next.tabIndex = 0;
+      next.focus();
+    });
+  }
+  let matrixTooltip;
+  function ensureMatrixTooltip() {
+    matrixTooltip = document.getElementById('graph-tooltip');
+    if (matrixTooltip) return;
+    matrixTooltip = document.createElement('div');
+    matrixTooltip.id = 'graph-tooltip';
+    matrixTooltip.hidden = true;
+    matrixTooltip.innerHTML =
+      '<div class="tt-inputs">' +
+        '<div class="tt-input"><div class="tt-input-board" data-slot="a-board"></div><div class="tt-input-name" data-slot="a-name"></div></div>' +
+        '<div class="tt-plus">+</div>' +
+        '<div class="tt-input"><div class="tt-input-board" data-slot="b-board"></div><div class="tt-input-name" data-slot="b-name"></div></div>' +
+      '</div>' +
+      '<div class="tt-divider"></div>' +
+      '<div class="tt-head"><span class="tt-name"></span><span class="tt-badge"></span></div>' +
+      '<div class="tt-board"></div>' +
+      '<div class="tt-betza"></div>';
+    // Inside the tab section, not body — body-level elements don't paint
+    // while the section is fullscreen. position:fixed still tracks the viewport.
+    document.getElementById('tab-matrix').appendChild(matrixTooltip);
+  }
+  let lastTooltipRow = null, lastTooltipCol = null;
+  function hideMatrixTooltip() {
+    if (matrixTooltip) matrixTooltip.hidden = true;
+    lastTooltipRow = lastTooltipCol = null;
+  }
+  const KIND_LABEL = { promotion: 'Promotion', additive: 'Additive fusion', synergistic: 'Synergistic fusion' };
+  function updateMatrixTooltip(td, ev) {
+    // mousemove fires continuously while the cursor sits on one cell; only
+    // rebuild the (expensive) three SVG boards when the cell actually changes.
+    if (td.classList.contains('is-filled') &&
+        td.dataset.row === lastTooltipRow && td.dataset.col === lastTooltipCol) {
+      positionFloating(matrixTooltip, ev);
+      return;
+    }
+    if (!td.classList.contains('is-filled')) { hideMatrixTooltip(); return; }
+    const cell = cellFor(td.dataset.row, td.dataset.col);
+    if (!cell) { hideMatrixTooltip(); return; }
+    const piece = byId.get(cell.result);
+    const a = byId.get(td.dataset.row);
+    const b = byId.get(td.dataset.col);
+    if (!piece || !a || !b) { hideMatrixTooltip(); return; }
+    matrixTooltip.querySelector('[data-slot="a-board"]').innerHTML = fullBoard(a);
+    matrixTooltip.querySelector('[data-slot="a-name"]').textContent = a.name;
+    matrixTooltip.querySelector('[data-slot="b-board"]').innerHTML = fullBoard(b);
+    matrixTooltip.querySelector('[data-slot="b-name"]').textContent = b.name;
+    matrixTooltip.querySelector('.tt-name').textContent = piece.name;
+    const badge = matrixTooltip.querySelector('.tt-badge');
+    badge.textContent = KIND_LABEL[cell.kind];
+    badge.className = 'tt-badge is-' + cell.kind;
+    matrixTooltip.querySelector('.tt-board').innerHTML = fullBoard(piece);
+    matrixTooltip.querySelector('.tt-betza').textContent = piece.betza || '';
+    matrixTooltip.className = 'is-' + cell.kind;
+    matrixTooltip.hidden = false;
+    lastTooltipRow = td.dataset.row;
+    lastTooltipCol = td.dataset.col;
+    positionFloating(matrixTooltip, ev);
+  }
+  function positionFloating(el, ev) {
+    const pad = 14;
+    const rect = el.getBoundingClientRect();
+    const W = window.innerWidth, H = window.innerHeight;
+    let x = ev.clientX + pad;
+    let y = ev.clientY + pad;
+    if (x + rect.width  + pad > W) x = ev.clientX - rect.width  - pad;
+    if (y + rect.height + pad > H) y = ev.clientY - rect.height - pad;
+    if (x < pad) x = pad;
+    if (y < pad) y = pad;
+    el.style.left = x + 'px';
+    el.style.top  = y + 'px';
+  }
+  function wireMatrixFilter() {
+    const input = document.getElementById('matrix-filter');
+    const table = document.getElementById('graph-table');
+    input.addEventListener('input', () => {
+      const q = input.value.trim().toLowerCase();
+      const visible = new Set();
+      for (const p of PIECES) {
+        const hay = (p.name + ' ' + (p.original_name || '') + ' ' + (p.aliases || []).join(' ')).toLowerCase();
+        if (!q || hay.includes(q)) visible.add(p.id);
+      }
+      for (const tr of table.querySelectorAll('tbody tr')) {
+        tr.classList.toggle('is-filtered-out', !visible.has(tr.dataset.id));
+      }
+    });
+  }
+
+  /* ============================================================
+   *  Tab 3: Graph — custom force-directed network
+   * ============================================================ */
+  const ALL_KINDS = ['promotion', 'fuse-with', 'fuse-into', 'inversion'];
+  const NET = { nodes: [], edges: [], nodeById: new Map(), kinds: new Set(ALL_KINDS) };
+  const NET_SVG_NS = 'http://www.w3.org/2000/svg';
+  const NODE_W = 48, NODE_H = 64; // 48x48 board + label height
+  const GRAPH_CANVAS = 1200;      // fixed layout canvas (user units), viewport-independent
+  function buildGraphTab() {
+    initGraphData();
+    layoutGraphInitial();
+    renderGraphScene();
+    wireGraphInteractions();
+    applyKindFilters();   // honour the default selected chip on first paint
+  }
+  function initGraphData() {
+    NET.nodes = ALL_PIECES_INCL_VOID.map(p => ({ id: p.id, piece: p, x: 0, y: 0, vx: 0, vy: 0, pinned: false }));
+    NET.nodeById = new Map(NET.nodes.map(n => [n.id, n]));
+    NET.edges = [];
+    // Promotion edges.
+    for (const Family of PROMOTION_FAMILIES) {
+      for (let i = 0; i < Family.ids.length - 1; i++) {
+        NET.edges.push({ kind: 'promotion', from: Family.ids[i], to: Family.ids[i + 1], directed: true });
+      }
+    }
+    // Fusion edges (both additive and synergistic from the codex data):
+    //   "fuse-with" edges (blue, undirected) connect the two inputs A <-> B.
+    //   "fuse-into" edges (purple, directed) flow each input into the output A -> C, B -> C.
+    for (const kind of ['additive', 'synergistic']) {
+      for (const { lhs, rhs, out } of FUSIONS[kind]) {
+        NET.edges.push({ kind: 'fuse-with', from: lhs, to: rhs, directed: false });
+        NET.edges.push({ kind: 'fuse-into', from: lhs, to: out, directed: true });
+        NET.edges.push({ kind: 'fuse-into', from: rhs, to: out, directed: true });
+      }
+    }
+    // Inversion edges (undirected).
+    for (const { lhs: a, rhs: b } of INVERSION_PAIRS) {
+      NET.edges.push({ kind: 'inversion', from: a, to: b, directed: false });
+    }
+  }
+  function layoutGraphInitial() {
+    // Constant canvas: layout no longer depends on the rendered size, so a
+    // graph built in a narrow window is identical to one built fullscreen —
+    // small viewports just scale the SVG down, fullscreen scales it up.
+    const W = GRAPH_CANVAS, H = GRAPH_CANVAS;
+    const CX = W / 2, CY = H / 2;
+    const MARGIN = NODE_W / 2 + 16;
+    const OUTER_R = Math.min(W, H) / 2 - MARGIN;
+    const VOID_GAP = NODE_W + 40;
+    const MAIN_R  = OUTER_R - VOID_GAP;
+    // Build the order of the 33 non-Void pieces, then place each Void piece
+    // on an outer ring aligned with its base piece's radial direction.
+    // (VOID_IDS = the 5 actual Void pieces. Other inversion pairs are between
+    // two regular pieces — both of those stay on the main ring.)
+    const CHAIN_ORDER = ['Pawn', 'Ferz', 'Wazir', 'Knight', 'Rook', 'Bishop', 'Alibaba', 'Kirin'];
+    const mainOrder = [];
+    const placed = new Set();
+    for (const title of CHAIN_ORDER) {
+      const Family = PROMOTION_FAMILIES.find(c => c.title === title);
+      if (!Family) continue;
+      for (const id of Family.ids) {
+        if (!placed.has(id) && !VOID_IDS.has(id)) { mainOrder.push(id); placed.add(id); }
+      }
+    }
+    for (const n of NET.nodes) {
+      if (!placed.has(n.id) && !VOID_IDS.has(n.id)) { mainOrder.push(n.id); placed.add(n.id); }
+    }
+    // Place the main ring (33 non-Void pieces). Start at -3 pi / 4 so the
+    // first Family begins down-left of centre and the ring reads clockwise.
+    const angleByMain = new Map();
+    for (let i = 0; i < mainOrder.length; i++) {
+      const n = NET.nodeById.get(mainOrder[i]);
+      if (!n) continue;
+      const angle = (i / mainOrder.length) * Math.PI * 2 - (3 * Math.PI / 4);
+      n.x = CX + Math.cos(angle) * MAIN_R;
+      n.y = CY + Math.sin(angle) * MAIN_R;
+      angleByMain.set(n.id, angle);
+    }
+    // For each inversion pair that involves an actual Void piece, place the
+    // Void on the outer ring radially aligned with its non-Void partner.
+    for (const { lhs: a, rhs: b } of INVERSION_PAIRS) {
+      const voidId = VOID_IDS.has(a) ? a : (VOID_IDS.has(b) ? b : null);
+      if (!voidId) continue;
+      const baseId = voidId === a ? b : a;
+      const baseAngle = angleByMain.get(baseId);
+      const v = NET.nodeById.get(voidId);
+      if (baseAngle === undefined || !v) continue;
+      v.x = CX + Math.cos(baseAngle) * OUTER_R;
+      v.y = CY + Math.sin(baseAngle) * OUTER_R;
+    }
+  }
+  function renderGraphScene() {
+    const svg = document.getElementById('network-svg');
+    svg.setAttribute('viewBox', '0 0 ' + GRAPH_CANVAS + ' ' + GRAPH_CANVAS);
+    // Arrow markers per directed edge kind.
+    const defs = document.createElementNS(NET_SVG_NS, 'defs');
+    for (const [kind, color] of [
+      ['promotion', 'var(--hop-target)'],
+      ['fuse-into', 'var(--hurdle-color)']
+    ]) {
+      const marker = document.createElementNS(NET_SVG_NS, 'marker');
+      marker.setAttribute('id', 'arrow-' + kind);
+      marker.setAttribute('viewBox', '0 0 10 10');
+      marker.setAttribute('refX', '8');
+      marker.setAttribute('refY', '5');
+      marker.setAttribute('markerWidth', '6');
+      marker.setAttribute('markerHeight', '6');
+      marker.setAttribute('orient', 'auto-start-reverse');
+      const path = document.createElementNS(NET_SVG_NS, 'path');
+      path.setAttribute('d', 'M 0 0 L 10 5 L 0 10 z');
+      path.setAttribute('fill', color);
+      marker.appendChild(path);
+      defs.appendChild(marker);
+    }
+    svg.appendChild(defs);
+    const gEdges = document.createElementNS(NET_SVG_NS, 'g');
+    gEdges.setAttribute('id', 'net-edges');
+    for (const e of NET.edges) {
+      // Promotion edges curve outward so they don't paint on top of any
+      // fuse-with / fuse-into / inversion edges that share the same endpoints.
+      const tag = e.kind === 'promotion' ? 'path' : 'line';
+      const el = document.createElementNS(NET_SVG_NS, tag);
+      el.setAttribute('class', 'net-edge is-' + e.kind);
+      if (e.directed) el.setAttribute('marker-end', 'url(#arrow-' + e.kind + ')');
+      el.dataset.from = e.from;
+      el.dataset.to = e.to;
+      el.dataset.kind = e.kind;
+      e.el = el;
+      gEdges.appendChild(el);
+    }
+    const gNodes = document.createElementNS(NET_SVG_NS, 'g');
+    gNodes.setAttribute('id', 'net-nodes');
+    for (const n of NET.nodes) {
+      const g = document.createElementNS(NET_SVG_NS, 'g');
+      g.setAttribute('class', 'net-node');
+      g.setAttribute('tabindex', '0');
+      g.setAttribute('role', 'button');
+      g.setAttribute('aria-label', n.piece.name);
+      g.dataset.id = n.id;
+      const HALF = NODE_W / 2;
+      // Strip the outer <svg> wrapper from renderBoard's output and embed its
+      // children inside a nested <svg> sized + cropped to the node box.
+      // Using innerHTML avoids DOMParser silently failing on non-XML content
+      // (e.g. apostrophes / ampersands inside <desc>).
+      // Also drop the board's <title>/<desc>: the node already carries an
+      // aria-label, and that duplicated text would land inside the node's
+      // accessible-name computation (WCAG 2.5.3 label-in-name).
+      // Strip the board's <title>/<desc> and hide its glyph <text> from the a11y
+      // tree: the node already carries an aria-label, so that duplicated text is
+      // decoration. aria-hidden does not hide it visually.
+      // Note: axe's label-content-name-mismatch still flags these nodes — its
+      // visible-text walk does not honour aria-hidden inside SVG, so it counts
+      // the glyph as a visible label. Screen readers do honour it, and voice
+      // control matches on the visible "Pawn" text, which IS the accessible
+      // name — so WCAG 2.5.3 holds. Lighthouse scores the rule at weight 0.
+      const boardInner = renderBoard(n.piece)
+        .replace(/^<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '')
+        .replace(/<title>[\s\S]*?<\/title>|<desc>[\s\S]*?<\/desc>/g, '')
+        .replace(/<text /g, '<text aria-hidden="true" ');
+      g.innerHTML =
+        '<rect class="net-node-bg" x="' + (-HALF) + '" y="' + (-HALF) + '" width="' + NODE_W + '" height="' + NODE_W + '" rx="6"/>' +
+        '<svg class="net-node-board" aria-hidden="true" viewBox="72 72 180 180" x="' + (-HALF) + '" y="' + (-HALF) + '" width="' + NODE_W + '" height="' + NODE_W + '">' + boardInner + '</svg>' +
+        '<text class="net-node-label" x="0" y="' + (HALF + 14) + '">' + escapeHtml(n.piece.name) + '</text>';
+      n.el = g;
+      gNodes.appendChild(g);
+    }
+    // Nodes are painted first so the edges (appended after) render ABOVE them.
+    svg.appendChild(gNodes);
+    svg.appendChild(gEdges);
+    updateGraphPositions();
+  }
+  function updateGraphPositions() {
+    for (const n of NET.nodes) {
+      n.el.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
+    }
+    // Center of the SVG (user space) — used to decide which side of the chord a
+    // curved edge bows toward.
+    const CX = GRAPH_CANVAS / 2, CY = GRAPH_CANVAS / 2;
+    for (const e of NET.edges) {
+      const a = NET.nodeById.get(e.from);
+      const b = NET.nodeById.get(e.to);
+      if (!a || !b) continue;
+      // Pull endpoint back from the node center by HALF_NODE so the arrow head is outside the box.
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const dist = Math.max(0.001, Math.hypot(dx, dy));
+      const ux = dx / dist, uy = dy / dist;
+      const inset = NODE_W / 2 + 4;
+      const x1 = a.x + ux * inset, y1 = a.y + uy * inset;
+      const x2 = b.x - ux * inset, y2 = b.y - uy * inset;
+      if (e.kind === 'promotion') {
+        // Quadratic-bezier control point offset perpendicular to the chord,
+        // always bowing OUTWARD from the SVG center. The sign is chosen from
+        // geometry (not A->B ordering) so every arrow curves the same way.
+        const CURVE = Math.min(40, dist * 0.22);
+        const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+        let perpx = uy, perpy = -ux;
+        const dot = perpx * (CX - mx) + perpy * (CY - my);
+        if (dot > 0) { perpx = -perpx; perpy = -perpy; }
+        const cpx = mx + perpx * CURVE;
+        const cpy = my + perpy * CURVE;
+        e.el.setAttribute('d', 'M ' + x1 + ',' + y1 + ' Q ' + cpx + ',' + cpy + ' ' + x2 + ',' + y2);
+      } else {
+        e.el.setAttribute('x1', x1);
+        e.el.setAttribute('y1', y1);
+        e.el.setAttribute('x2', x2);
+        e.el.setAttribute('y2', y2);
+      }
+    }
+  }
+  /* The force sim is gone: nodes are laid out once by layoutGraphInitial and
+     never move (dragging was removed on purpose — layout is now static). */
+  /* Interactions: drag-pin, hover-highlight, tooltip, double-click. */
+  let netTooltip;
+  function ensureNetTooltip() {
+    netTooltip = document.getElementById('network-tooltip');
+    if (netTooltip) return;
+    netTooltip = document.createElement('div');
+    netTooltip.id = 'network-tooltip';
+    netTooltip.hidden = true;
+    netTooltip.innerHTML =
+      '<div class="nt-name"></div>' +
+      '<div class="nt-relations"></div>';
+    document.getElementById('tab-graph').appendChild(netTooltip);
+  }
+  // Build the rows for the tooltip's Relations section.
+  //   - Promotion + Inversion: one row per matching edge (standard layout).
+  //   - Fusion: pair the partner (fuse-with) and the output (fuse-into) in a
+  //     single row when the node is an INPUT. When the node is the OUTPUT,
+  //     show one row per fusion as "made from <lhs> + <rhs>".
+  // Each relation row reads: <verb> <conn>  <arrow>  <pieces…>
+  //   verb is relation-coloured, conn ("from"/"to"/"with") is grey, the arrow
+  //   glyph is grey, piece names take the relation colour, and the inner
+  //   separators ("→" between a fuse partner+output, "+" between fused-from
+  //   inputs) are grey.
+  function buildRelations(node) {
+    const rows = [];
+    const piece = (name, role) => ({ type: 'piece', text: name, role });
+    const sep   = s    => ({ type: 'sep',   text: s });
+
+    // Promotion (NET.edges): this→other = "promote to", other→this = "promote from".
+    if (NET.kinds.has('promotion')) {
+      for (const e of NET.edges) {
+        if (e.kind !== 'promotion') continue;
+        const isFrom = e.from === node.id, isTo = e.to === node.id;
+        if (!isFrom && !isTo) continue;
+        const other = NET.nodeById.get(isFrom ? e.to : e.from);
+        if (!other) continue;
+        rows.push({
+          section: 0, kind: 'promotion', verb: 'promote',
+          conn: isFrom ? 'to' : 'from',
+          arrow: isFrom ? '→' : '←',
+          pieces: [ piece(other.piece.name) ],
+          sortKey: other.piece.name
+        });
+      }
+    }
+    // Fusion (walk FUSIONS so we can pair partner + output).
+    if (NET.kinds.has('fuse-with') || NET.kinds.has('fuse-into')) {
+      for (const kind of ['additive', 'synergistic']) {
+        for (const { lhs, rhs, out } of FUSIONS[kind]) {
+          if (lhs === node.id || rhs === node.id) {
+            const partner = byId.get(lhs === node.id ? rhs : lhs);
+            const output  = byId.get(out);
+            if (!partner || !output) continue;
+            rows.push({
+              section: 1, kind: 'fusion', verb: 'fuses', conn: 'with', arrow: '→',
+              pieces: [ piece(partner.name), sep('→'), piece(output.name, 'output') ],
+              sortKey: partner.name
+            });
+          } else if (out === node.id) {
+            const a = byId.get(lhs), b = byId.get(rhs);
+            if (!a || !b) continue;
+            rows.push({
+              section: 1, kind: 'fusion', verb: 'fused', conn: 'from', arrow: '←',
+              pieces: [ piece(a.name), sep('+'), piece(b.name) ],
+              sortKey: a.name
+            });
+          }
+        }
+      }
+    }
+    // Inversion (NET.edges).
+    if (NET.kinds.has('inversion')) {
+      for (const e of NET.edges) {
+        if (e.kind !== 'inversion') continue;
+        const isFrom = e.from === node.id, isTo = e.to === node.id;
+        if (!isFrom && !isTo) continue;
+        const other = NET.nodeById.get(isFrom ? e.to : e.from);
+        if (!other) continue;
+        rows.push({
+          section: 2, kind: 'inversion', verb: 'inverts', conn: 'to', arrow: '↔',
+          pieces: [ piece(other.piece.name) ],
+          sortKey: other.piece.name
+        });
+      }
+    }
+    rows.sort((a, b) => a.section - b.section || a.sortKey.localeCompare(b.sortKey));
+    return rows;
+  }
+  function renderRelationRow(r) {
+    const pieces = r.pieces.map(pp => pp.type === 'sep'
+      ? '<span class="nt-rel-sep' + (pp.text === '+' ? ' is-plus' : '') + '">' + escapeHtml(pp.text) + '</span>'
+      : '<span class="nt-rel-piece' + (pp.role === 'output' ? ' is-output' : '') + '">' + escapeHtml(pp.text) + '</span>'
+    ).join('');
+    return '<div class="nt-rel is-' + r.kind + '">' +
+      '<span class="nt-rel-label"><span class="nt-rel-verb">' + r.verb + '</span> ' +
+        '<span class="nt-rel-conn">' + r.conn + '</span></span>' +
+      '<span class="nt-rel-arrow">' + r.arrow + '</span>' +
+      '<span class="nt-rel-pieces">' + pieces + '</span>' +
+    '</div>';
+  }
+  function showNetTooltipContent(node) {
+    if (!netTooltip) ensureNetTooltip();
+    const p = node.piece;
+    netTooltip.querySelector('.nt-name').textContent = p.name;
+    const rel = buildRelations(node);
+    const relEl = netTooltip.querySelector('.nt-relations');
+    if (!rel.length) {
+      relEl.innerHTML = '';
+    } else {
+      relEl.innerHTML = '<div class="nt-rel-head">Relations</div>' + rel.map(renderRelationRow).join('');
+    }
+    netTooltip.hidden = false;
+  }
+  function showNetTooltip(node, ev) {
+    showNetTooltipContent(node);
+    positionFloating(netTooltip, ev);
+  }
+  function hideNetTooltip() { if (netTooltip) netTooltip.hidden = true; }
+  function highlightNeighbors(nodeId) {
+    const keepNodes = new Set([nodeId]);
+    const keepEdges = new Set();
+    NET.edges.forEach((e, idx) => {
+      // Only traverse edges that are currently visible (matching the active
+      // filter chip). Hidden-kind edges don't pull in their endpoint nodes.
+      if (!NET.kinds.has(e.kind)) return;
+      if (e.from === nodeId || e.to === nodeId) {
+        keepEdges.add(idx);
+        keepNodes.add(e.from);
+        keepNodes.add(e.to);
+      }
+    });
+    for (const n of NET.nodes) n.el.classList.toggle('is-faded', !keepNodes.has(n.id));
+    NET.edges.forEach((e, idx) => e.el.classList.toggle('is-faded', !keepEdges.has(idx)));
+  }
+  function clearHighlight() {
+    for (const n of NET.nodes) n.el.classList.remove('is-faded');
+    for (const e of NET.edges) e.el.classList.remove('is-faded');
+  }
+  function applyKindFilters() {
+    for (const e of NET.edges) {
+      const visible = NET.kinds.has(e.kind);
+      e.el.classList.toggle('is-hidden', !visible);
+    }
+  }
+  function wireGraphInteractions() {
+    ensureNetTooltip();
+    const svg = document.getElementById('network-svg');
+    let pressed = null, dragStart = null;
+    // Selected node — once a node has been tapped/clicked, the highlight and
+    // tooltip stay locked to it until the user taps another node or anywhere
+    // outside the SVG. Critical for mobile, where there's no hover.
+    let selected = null;
+    function selectNode(n, ev) {
+      selected = n.id;
+      highlightNeighbors(n.id);
+      showNetTooltip(n, ev);
+    }
+    function clearSelection() {
+      selected = null;
+      clearHighlight();
+      hideNetTooltip();
+    }
+    // Node-level handlers — hover only acts when nothing is locked.
+    svg.addEventListener('pointerover', (ev) => {
+      if (selected) return;
+      const g = ev.target.closest('.net-node');
+      if (!g) return;
+      const n = NET.nodeById.get(g.dataset.id);
+      if (!n) return;
+      highlightNeighbors(n.id);
+      showNetTooltip(n, ev);
+    });
+    svg.addEventListener('pointermove', (ev) => {
+      if (selected) return;        // locked tooltip stays put
+      const g = ev.target.closest('.net-node');
+      if (g) {
+        const n = NET.nodeById.get(g.dataset.id);
+        if (n) positionFloating(netTooltip, ev);
+      }
+    });
+    svg.addEventListener('pointerout', (ev) => {
+      if (selected) return;        // sticky selection survives pointerout
+      if (ev.relatedTarget && ev.relatedTarget.closest && ev.relatedTarget.closest('.net-node')) return;
+      clearHighlight();
+      hideNetTooltip();
+    });
+    // Nodes can't be dragged — pointerdown only arms a possible tap; a press
+    // that travels >4px is a scroll/swipe and selects nothing.
+    svg.addEventListener('pointerdown', (ev) => {
+      const g = ev.target.closest('.net-node');
+      if (!g) return;
+      const n = NET.nodeById.get(g.dataset.id);
+      if (!n) return;
+      pressed = n;
+      dragStart = { x: ev.clientX, y: ev.clientY };
+    });
+    svg.addEventListener('pointercancel', () => { pressed = null; dragStart = null; });
+    svg.addEventListener('pointerup', (ev) => {
+      if (!pressed) return;
+      const moved = Math.hypot(ev.clientX - dragStart.x, ev.clientY - dragStart.y) > 4;
+      if (!moved) {
+        // Pure tap: toggle selection on this node. Pin tracks selection.
+        if (selected === pressed.id) {
+          pressed.pinned = false;
+          pressed.el.classList.remove('is-pinned');
+          clearSelection();
+        } else {
+          pressed.pinned = true;
+          pressed.el.classList.add('is-pinned');
+          selectNode(pressed, ev);
+        }
+      }
+      pressed = null; dragStart = null;
+    });
+    // Tapping anywhere outside the graph SVG clears the locked selection.
+    document.addEventListener('click', (ev) => {
+      if (!selected) return;
+      if (ev.target.closest('#network-svg')) return;
+      // Don't clear when tapping the filter chips above the graph either.
+      if (ev.target.closest('#tab-graph .controls')) return;
+      // Unpin the previously selected node when clearing.
+      const prev = NET.nodeById.get(selected);
+      if (prev) {
+        prev.pinned = false;
+        if (prev.el) prev.el.classList.remove('is-pinned');
+      }
+      clearSelection();
+    });
+    function openNodeInCodex(g) {
+      if (!g) return;
+      const n = NET.nodeById.get(g.dataset.id);
+      if (!n) return;
+      window.open('codex.html?q=' + encodeURIComponent(n.piece.name), '_blank', 'noopener');
+    }
+    svg.addEventListener('dblclick', (ev) => {
+      openNodeInCodex(ev.target.closest('.net-node'));
+    });
+    // Keyboard activation for focused nodes (Enter / Space) mirrors dblclick.
+    svg.addEventListener('keydown', (ev) => {
+      if (ev.key !== 'Enter' && ev.key !== ' ' && ev.key !== 'Spacebar') return;
+      const g = ev.target.closest && ev.target.closest('.net-node');
+      if (!g) return;
+      ev.preventDefault();
+      openNodeInCodex(g);
+    });
+    // Filter chips:
+    //   "All" is exclusive — turning it on deactivates every other chip.
+    //   Fusion / Promotion / Inversion are independently toggleable. Activating
+    //   any of them deactivates "All".
+    const chips = Array.from(document.querySelectorAll('#tab-graph .toggle-chip'));
+    const allChip = chips.find(c => c.dataset.kind === 'all');
+    function chipKinds(c) {
+      const k = c.dataset.kind;
+      if (k === 'fusion') return ['fuse-with', 'fuse-into'];
+      return [k];
+    }
+    function recomputeKindsFromChips() {
+      const active = new Set();
+      for (const c of chips) {
+        if (c === allChip) continue;
+        if (c.getAttribute('aria-pressed') !== 'true') continue;
+        for (const k of chipKinds(c)) active.add(k);
+      }
+      return active;
+    }
+    chips.forEach(chip => {
+      chip.addEventListener('click', () => {
+        if (chip === allChip) {
+          allChip.setAttribute('aria-pressed', 'true');
+          chips.forEach(c => { if (c !== allChip) c.setAttribute('aria-pressed', 'false'); });
+          NET.kinds = new Set(ALL_KINDS);
+        } else {
+          // Toggle this chip; turning anything on deactivates the All chip.
+          const wasPressed = chip.getAttribute('aria-pressed') === 'true';
+          chip.setAttribute('aria-pressed', wasPressed ? 'false' : 'true');
+          allChip.setAttribute('aria-pressed', 'false');
+          NET.kinds = recomputeKindsFromChips();
+        }
+        applyKindFilters();
+        // If a node is selected, re-apply the highlight + relation list
+        // under the new filter so the dim/visible nodes line up.
+        if (selected) {
+          const n = NET.nodeById.get(selected);
+          if (n) {
+            highlightNeighbors(selected);
+            showNetTooltipContent(n);
+          }
+        }
+      });
+    });
+  }
+
+  /* Build the default Pieces tab on page load. */
+  buildGraphTab(); built.graph = true;
+  </script>
+  <script>
+  // Fullscreen: each tab section goes fullscreen via its controls-row button.
+  // Esc works natively; the button flips to an exit control while active.
+  // iPhones (WebKit) have no element-fullscreen API, so the section pins to
+  // the viewport with the .fake-fs overlay instead — same button, same flip.
+  function setFsButtons(on) {
+    for (const btn of document.querySelectorAll('.fs-btn')) {
+      btn.textContent = on ? '\u2715' : '\u26f6';
+      btn.title = on ? 'Exit fullscreen' : 'Fullscreen';
+      btn.setAttribute('aria-label', btn.title);
+    }
+  }
+  for (const btn of document.querySelectorAll('.fs-btn')) {
+    const sec = btn.closest('section');
+    btn.addEventListener('click', () => {
+      if (sec.requestFullscreen) {
+        if (document.fullscreenElement) document.exitFullscreen();
+        else sec.requestFullscreen();
+      } else {
+        const on = sec.classList.toggle('fake-fs');
+        document.documentElement.style.overflow = on ? 'hidden' : '';
+        setFsButtons(on);
+      }
+    });
+  }
+  document.addEventListener('fullscreenchange', () => setFsButtons(!!document.fullscreenElement));
+  </script>
+  <script src="assets/nav.js"></script>
+  <script src="assets/theme.js"></script>
+  <script src="assets/tabs.js"></script>
+</body>
+</html>

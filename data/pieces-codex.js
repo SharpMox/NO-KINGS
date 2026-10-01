@@ -316,7 +316,7 @@ var PIECES_CODEX = [
       glyph: '♜',
       betza: 'R',
       origin: 'Standard',
-      description: 'Slides any number of squares along ranks or files. Participates with the King in castling.',
+      description: 'Slides any number of squares along ranks or files.',
       description_codex: 'Slides any distance along ranks and files. Promotes to Drakehold. Fuses with several partners to form Drakehold, Dragonlord, and Queen, among others.',
       behaviors: ['long-range'],
       moves: [

@@ -13,7 +13,7 @@ var PIECES_ENCYCLOPEDIA = [
       glyph: '♚',
       betza: 'K',
       origin: 'Standard',
-      description: 'Moves one square in any of 8 directions. The royal piece — losing it ends the game. Castling allows a special two-square move with a friendly rook.',
+      description: 'Moves one square in any of 8 directions. The royal piece: in NO KINGS only the enemy fields one, as the boss of a King wave, and it falls to capture or checkmate.',
       behaviors: ['royal'],
       moves: [
         { kind: 'dots', squares: [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]] }
@@ -43,7 +43,7 @@ var PIECES_ENCYCLOPEDIA = [
       glyph: '♜',
       betza: 'R',
       origin: 'Standard',
-      description: 'Slides any number of squares along ranks or files. Participates with the King in castling.',
+      description: 'Slides any number of squares along ranks or files.',
       behaviors: ['long-range'],
       moves: [
         { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1]] }

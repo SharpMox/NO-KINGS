@@ -297,8 +297,8 @@
   .row[open] .r-caret{transform:rotate(180deg);background:var(--c);color:var(--dark-ink)}
 
   .r-open{padding:2px 16px 18px 34px;display:grid;gap:24px}
-  /* Art is a LEADING column on EVERY row: the 92 painted artefacts show their
-     own file, the other 88 show the placeholder, so the detail layout is the
+  /* Art is a LEADING column on EVERY row: the 116 painted artefacts show their
+     own file, the other 64 show the placeholder, so the detail layout is the
      same shape either way and rows do not jump width as you open them. */
   .r-open{grid-template-columns:128px 1.1fr 1fr}
   .r-art{
@@ -307,7 +307,7 @@
   }
   /* The placeholder is the GAME's asset (game/assets/ui/art_placeholder.svg),
      painted for the game's dark-only UI. Light is this page's BASE theme, and
-     unmodified it lands as a near-black slab on cream — on 88 of 180 rows,
+     unmodified it lands as a near-black slab on cream — on 64 of 180 rows,
      reading as a hole rather than as "pending". Its greys are pure neutrals,
      so an invert is a clean lightness flip with no hue shift. Dark, which is
      what it was drawn for, keeps it untouched. One asset, same as the game,

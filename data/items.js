@@ -86,6 +86,12 @@ var ITEMS = [
   { key: "buff_box", name: "Buff Box", tier: "Strategic", target: "tile",
     fires: ["on_item_consume", "on_buff_apply"],
     description: "Pick 1 of 3 random Piece Buffs, then apply it to any piece, ally or enemy." },
+  // Feedback 2026-10-17: Ctrl+Z for a Turn. fires nothing: game.gd's _rewind
+  // restores the previous Turn's snapshot instead of passing through
+  // _consume_item, since the restore would erase whatever a hook did there.
+  { key: "rewind", name: "Rewind", tier: "Decisive", target: "", action_cost: 0,
+    fires: [],
+    description: "Go back to the start of your previous Turn, exactly as it was. The Clock keeps running. Not past the start of a Wave." },
 ];
 
 /* Piece Buffs — one-shot effects that ride on a single board piece, delivered

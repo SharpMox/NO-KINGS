@@ -83,7 +83,7 @@ var ITEMS = [
   { key: "surprise_attack", name: "Surprise Attack", tier: "Decisive", target: "",
     fires: ["on_item_consume"], suppresses: ["on_enemy_turn_start"],
     description: "Take another turn right after this one. The enemy skips its turn." },
-  { key: "buff_box", name: "Buff Box", tier: "Strategic", target: "tile",
+  { key: "buff_box", name: "Buff Pack", tier: "Strategic", target: "tile",
     fires: ["on_item_consume", "on_buff_apply"],
     description: "Pick 1 of 3 random Piece Buffs, then apply it to any piece, ally or enemy." },
   // Feedback 2026-10-17: Ctrl+Z for a Turn. fires nothing: game.gd's _rewind
@@ -95,7 +95,7 @@ var ITEMS = [
 ];
 
 /* Piece Buffs — one-shot effects that ride on a single board piece, delivered
-   by the Buff Box item (GDD Piece Buffs DB). Two models:
+   by the Buff Pack item (GDD Piece Buffs DB). Two models:
      dormant — sits on the piece until its trigger fires, then resolves and is
                consumed. No expiry: it can wait forever.
      timed   — activates on application and runs for a fixed window.
@@ -133,7 +133,7 @@ var PIECE_BUFFS = [
   { key: "slow", name: "Slow", tier: "Tactical", model: "timed", turns: 1,
     // A DEBUFF on its own holder (ruled 2026-08-28) — a RANDOM artefact grant
     // must never hand a piece this by accident (see artefact_hooks.gd's
-    // _random_buff_key); the player's own Buff Box pick still offers it
+    // _random_buff_key); the player's own Buff Pack pick still offers it
     // (game.gd _open_buff_pick reads PIECE_BUFFS directly), since choosing Slow
     // deliberately (e.g. onto an enemy) is legitimate. Smog debuffs *adjacent
     // enemies*, not its holder, so it stays a genuine buff and carries no flag.

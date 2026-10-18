@@ -251,7 +251,7 @@ var ARTEFACTS = [
     conspiracy: "Project MKUltra", url: "https://en.wikipedia.org/wiki/Project_MKUltra",
     summary: "The CIA really ran mind-control experiments on unwitting subjects for twenty years — confirmed in 1977 hearings after most files were destroyed. 'Monarch programming' is the mythology that grew where the shredded records used to be." },
   { name: "mRNA Firmware Update", key: "mrna-firmware-update", rarity: "Common", type: "Passive", bonus: ["Buff"], status: "KEEP", implemented: true,
-    effect: "Buff Boxes offer +2 Piece Buff choices.",
+    effect: "Buff Packs offer +2 Piece Buff choices.",
     conspiracy: "The vaccine microchip claim", url: "https://en.wikipedia.org/wiki/COVID-19_misinformation",
     summary: "The 2020 claim that vaccines carried tracking microchips. No chip that fits a needle exists — and the people worried about being tracked carried a GPS phone into the clinic to say so." },
   { name: "Nero's Marshmallow Stick", key: "nero-s-marshmallow-stick", rarity: "Common", type: "Passive", bonus: ["Gold"], status: "KEEP", implemented: true,

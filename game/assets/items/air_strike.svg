@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 100 100" fill="#ffd94d"><g transform="rotate(45 50 50)">
+    <path d="M50 6c10 12 14 26 14 40v22H36V46c0-14 4-28 14-40z"/>
+    <polygon points="36,60 22,80 36,74"/>
+    <polygon points="64,60 78,80 64,74"/>
+    <polygon points="42,74 50,94 58,74"/></g></svg>

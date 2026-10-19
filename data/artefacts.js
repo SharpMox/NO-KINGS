@@ -67,10 +67,10 @@
    2026-08-29 (issue 54): 5 of the 6 remaining artefacts flipped to
    implemented: true. UAP Breath Mint / Inflatable Vietcong Torpedo both
    auto-resolve (user ruling: no targeting step, no Gold prompt) and extend
-   BuffLogic's existing repel path in game.gd's _run_enemy_actions. Hellfire
-   Club Discord Invite gates game.gd's _on_pass with a "no legal Action"
-   escape hatch (Rules.legal_moves/_deploy_tiles/_has_usable_item) so the new
-   Pass restriction can never softlock a Turn. Pegasus Free Trial was
+   BuffLogic's existing repel path in game.gd's _run_enemy_actions.
+   Obedience-Flavored Tap Water gates game.gd's _on_pass with a "no legal
+   Action" escape hatch (Rules.legal_moves/_deploy_tiles/_has_usable_item) so
+   the new Pass restriction can never softlock a Turn. Pegasus Free Trial was
    reworked by the user away from its old "move twice" text (which would
    have redefined moved_this_turn, the field Blitz depends on) to "first
    move/capture each Turn is free", reusing Blitz's own blitz_free_move flag

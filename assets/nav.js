@@ -27,6 +27,7 @@
     ['fusion',       'fusion.html',           'Fusions'],
     ['inversion',    'inversion.html',        'Inversions'],
     ['artefacts',    'artefacts.html',        'Artefacts'],
+    ['buffs',        'buffs.html',            'Buffs'],
     ['encyclopedia', 'encyclopedia/index.html', 'Encyclopedia', 'gap'],
     ['betza',        'betza.html',            'Betza']
   ];

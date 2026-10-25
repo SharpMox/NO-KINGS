@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="The 13 Piece Buffs: dormant triggers and timed effects that attach to a piece on the board.">
+  <title>NO KINGS / Buffs</title>
+  <link rel="stylesheet" href="assets/nav.css">
+  <script src="assets/theme-init.js"></script>
+  <script src="data/items.js"></script>
+  <style>
+  /* ============================================================
+   *  Buffs — a minimal list of the 13 Piece Buffs. Follows
+   *  codex.html / artefacts.html, the design pilot: no assets/site.css,
+   *  own tokens, shares assets/nav.{css,js} and assets/theme.js so the
+   *  header and the light/dark choice stay in sync with the rest of
+   *  the site. No filters, no search — just PIECE_BUFFS rendered.
+   * ============================================================ */
+
+  /* ---------- Tokens. Light is :root to match the rest of the site,
+       where theme.js ADDS [data-theme="dark"] and removes it for light. ---------- */
+  :root{
+    --bg:#f4ecda; --surface:#fcf0d8; --surface-2:#fff8ea;
+    --border:#e0d0ae; --border-soft:#ebdcbf;
+    --text:#231544; --text-soft:#5f5080; --text-dim:#6f6484;
+    --violet:#6a2ed0; --violet-hi:#8a52d8;
+    --lime:#577319; --accent:var(--lime); --dark-ink:#141024;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --rad-xs:4px; --rad-ctl:8px; --rad-pill:999px;
+    --doc-measure:760px;
+  }
+  [data-theme="dark"]{
+    --bg:#0f0a1c; --surface:#181030; --surface-2:#221643;
+    --border:#332352; --border-soft:#261a44;
+    --text:#efeaff; --text-soft:#a79ac9; --text-dim:#8c81a9;
+    --violet:#7a3ae8; --violet-hi:#a070e8;
+    --lime:#a8d048;
+  }
+
+  /* ---------- Base (restated, since site.css is not loaded) ---------- */
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  html{overflow-x:clip}
+  body{font-family:var(--sans);background:var(--bg);color:var(--text);line-height:1.5;
+    -webkit-font-smoothing:antialiased;transition:background .25s ease,color .25s ease}
+  a{color:var(--accent)}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:var(--rad-ctl)}
+
+  .hero{max-width:var(--doc-measure);margin:0 auto;padding:48px 22px 18px}
+  .hero h1{margin:0;font-size:clamp(38px,6.6vw,60px);line-height:.95;font-weight:800;letter-spacing:-.03em}
+  .hero h1 em{font-style:italic;background:linear-gradient(96deg,var(--lime) 0%,var(--violet-hi) 92%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;padding-right:.07em}
+  .hero p{margin:14px 0 0;max-width:52ch;font-size:16.5px;color:var(--text-soft)}
+
+  main{max-width:var(--doc-measure);margin:0 auto;padding:4px 22px 72px}
+
+  .bf-tier{margin:30px 0 4px;padding-top:18px;border-top:1px solid var(--border-soft);
+    font:700 11px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--text-dim)}
+  .bf-tier:first-child{margin-top:0;padding-top:0;border-top:none}
+
+  .bf-row{display:flex;gap:14px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--border-soft)}
+  .bf-icon{flex:none;width:36px;height:36px;border-radius:var(--rad-xs)}
+  .bf-info{flex:1;min-width:0}
+  .bf-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .bf-name{font-weight:700;font-size:15px}
+  .bf-model{font:600 10px/1 var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--text-dim);
+    background:var(--surface-2);border:1px solid var(--border-soft);border-radius:var(--rad-pill);padding:3px 9px}
+  .bf-desc{margin:4px 0 0;font-size:13.5px;line-height:1.55;color:var(--text-soft)}
+
+  .foot{max-width:var(--doc-measure);margin:0 auto;padding:26px 22px 52px;
+    border-top:1px solid var(--border-soft);color:var(--text-dim);font-size:13px}
+  .foot p{margin:0 0 7px}
+  .foot p:last-child{margin-bottom:0}
+  .foot-lead{color:var(--text-soft);font-size:14px}
+
+  @media(max-width:560px){
+    .hero{padding:34px 16px 14px}
+    main{padding:4px 16px 56px}
+    .foot{padding:20px 16px 40px}
+  }
+  </style>
+</head>
+<body>
+<div id="site-nav" data-page="buffs"></div>
+
+<header class="hero"><h1><em>Buffs</em></h1>
+<p>The 13 Piece Buffs that attach to a piece on the board: dormant ones wait for a trigger, timed ones tick down over turns.</p></header>
+
+<main>
+<section id="buffs"></section>
+</main>
+
+<footer class="foot">
+  <p class="foot-lead">All 13 Piece Buffs, grouped by tier.</p>
+  <p>From the Items &amp; Piece Buffs catalog (<code>data/items.js</code>). Built as a single static HTML file — no servers, no frameworks.</p>
+</footer>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+const TIERS = ['Tactical', 'Strategic', 'Decisive'];
+function modelLabel(b){
+  return b.model === 'timed' ? `Timed &#183; ${b.turns} turn${b.turns === 1 ? '' : 's'}` : 'Dormant';
+}
+function rowHTML(b){
+  return `<div class="bf-row">
+    <img class="bf-icon" src="game/assets/buffs/${b.key}.png" alt="" width="36" height="36" loading="lazy">
+    <div class="bf-info">
+      <div class="bf-head"><span class="bf-name">${esc(b.name)}</span><span class="bf-model">${modelLabel(b)}</span></div>
+      <p class="bf-desc">${esc(b.description)}</p>
+    </div>
+  </div>`;
+}
+$('#buffs').innerHTML = TIERS.map(t => `
+  <h2 class="bf-tier">${esc(t)}</h2>
+  ${PIECE_BUFFS.filter(b => b.tier === t).map(rowHTML).join('')}
+`).join('');
+</script>
+<script src="assets/nav.js"></script>
+<script src="assets/theme.js"></script>
+</body>
+</html>

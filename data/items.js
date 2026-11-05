@@ -114,7 +114,7 @@ var PIECE_BUFFS = [
     description: "This piece's next capture also takes one enemy beside the captured piece." },
   { key: "taunt", name: "Taunt", tier: "Tactical", model: "dormant",
     fires: [],
-    description: "Enemies that can capture this piece always take it first." },
+    description: "Enemies that can capture this piece take it first." },
   { key: "stun", name: "Stun", tier: "Tactical", model: "dormant",
     fires: [],
     description: "The piece that captures this one loses its next 2 turns." },

@@ -69,6 +69,19 @@
     background:var(--surface-2);border:1px solid var(--border-soft);border-radius:var(--rad-pill);padding:3px 9px}
   .bf-desc{margin:4px 0 0;font-size:13.5px;line-height:1.55;color:var(--text-soft)}
 
+  /* ---------- Status marks: no PNG (NO-KINGS catalog has no art for these),
+       so the badge is code-drawn to match board_view.gd's paint_buff_badge —
+       a black box, a 1px accent border, the glyph in that accent colour.
+       --sm-col carries each row's accent (red for a harm, amber for a benefit). ---------- */
+  #statusmarks h2{margin-top:30px;padding-top:18px;border-top:1px solid var(--border-soft)}
+  .sm-intro{margin:4px 0 14px;font-size:13.5px;line-height:1.55;color:var(--text-soft)}
+  .sm-row{display:flex;gap:14px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--border-soft)}
+  .sm-badge{flex:none;width:36px;height:36px;border-radius:var(--rad-xs);display:flex;align-items:center;
+    justify-content:center;background:rgba(0,0,0,.85);border:1px solid var(--sm-col);color:var(--sm-col);
+    font-size:17px;line-height:1}
+  .sm-tag{font:600 10px/1 var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--sm-col);
+    background:var(--surface-2);border:1px solid var(--border-soft);border-radius:var(--rad-pill);padding:3px 9px}
+
   .foot{max-width:var(--doc-measure);margin:0 auto;padding:26px 22px 52px;
     border-top:1px solid var(--border-soft);color:var(--text-dim);font-size:13px}
   .foot p{margin:0 0 7px}
@@ -90,6 +103,11 @@
 
 <main>
 <section id="buffs"></section>
+<section id="statusmarks">
+  <h2 class="bf-tier">Status marks</h2>
+  <p class="sm-intro">What another piece's effect is doing to this one on the board — drawn in the tile's top-right corner, apart from this piece's own Buff badges, which sit low on the tile. Only Stunned and Smogged are red, a harm; Aura is amber, a benefit.</p>
+  <div id="sm-rows"></div>
+</section>
 </main>
 
 <footer class="foot">
@@ -118,6 +136,35 @@ $('#buffs').innerHTML = TIERS.map(t => `
   <h2 class="bf-tier">${esc(t)}</h2>
   ${PIECE_BUFFS.filter(b => b.tier === t).map(rowHTML).join('')}
 `).join('');
+
+// Status marks: Stunned, Smogged, Aura — board_view.gd's _draw_status_marks.
+// None has a PNG, so each badge is code-drawn (sm-badge), matching the
+// game's own fallback (paint_buff_badge): a black box, a 1px accent border,
+// the glyph in that colour. Smog/Aura reuse their catalogued Buff's own
+// glyph and description, pulled from data (PIECE_BUFFS), the same way the
+// board does (BuffLogic.glyph_of); Stunned has no PIECE_BUFFS entry (the
+// game's own glyph_of("stunned") returns ""), so its glyph and colour are
+// the board's hardcoded G.STUN_BADGE_GLYPH/G.STUN_BADGE_COL, restated here.
+const smogBuff = PIECE_BUFFS.find(b => b.key === 'smog');
+const auraBuff = PIECE_BUFFS.find(b => b.key === 'aura');
+const STATUS_MARKS = [
+  { name: 'Stunned', glyph: '⊘', col: '#f2594d', tag: 'Harm',
+    meaning: "This piece can't act this turn." },
+  { name: 'Smogged', glyph: '≋', /* the board's Smog glyph (buff_logic.gd PIECE_BUFF_GLYPHS) */ col: '#f2594d', tag: 'Harm',
+    meaning: `Inside an enemy's Smog cloud — the Smog Buff's own effect: “${smogBuff.description}”` },
+  { name: 'Aura', glyph: '✳', /* the board's Aura glyph (buff_logic.gd PIECE_BUFF_GLYPHS) */ col: '#ffb826', tag: 'Benefit',
+    meaning: `Inside a friendly Aura — the Aura Buff's own effect: “${auraBuff.description}”` },
+];
+function smRowHTML(m){
+  return `<div class="sm-row" style="--sm-col:${m.col}">
+    <span class="sm-badge" aria-hidden="true">${esc(m.glyph)}</span>
+    <div class="bf-info">
+      <div class="bf-head"><span class="bf-name">${esc(m.name)}</span><span class="sm-tag">${esc(m.tag)}</span></div>
+      <p class="bf-desc">${esc(m.meaning)}</p>
+    </div>
+  </div>`;
+}
+$('#sm-rows').innerHTML = STATUS_MARKS.map(smRowHTML).join('');
 </script>
 <script src="assets/nav.js"></script>
 <script src="assets/theme.js"></script>

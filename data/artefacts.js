@@ -502,7 +502,7 @@ var ARTEFACTS = [
     conspiracy: "The Nazca Lines", url: "https://en.wikipedia.org/wiki/Nazca_Lines",
     summary: "Desert figures kilometres long, fully visible only from the air — ancient-astronaut writers read them as runways. With a valid boarding pass, everywhere is a landing strip." },
   { name: "Obedience-Flavored Tap Water", key: "obedience-flavored-tap-water", rarity: "Legendary", type: "Passive", bonus: ["Action"], status: "KEEP", implemented: true,
-    effect: "+2 Actions per Turn; you can't Pass while Actions remain.",
+    effect: "If you Passed last Turn: +2 Actions this Turn.",
     conspiracy: "Water fluoridation", url: "https://en.wikipedia.org/wiki/Water_fluoridation_controversy",
     summary: "Cold War America's homegrown panic: fluoride in the tap water as a communist plot to soften minds. Immortalized by Dr. Strangelove's General Ripper and his precious bodily fluids." },
   { name: "Snowden's Rubik's Cube", key: "snowden-s-rubik-s-cube", rarity: "Legendary", type: "Passive", bonus: ["Special"], status: "KEEP", implemented: true,

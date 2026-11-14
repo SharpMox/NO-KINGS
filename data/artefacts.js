@@ -1,5 +1,6 @@
 /* Artefacts catalog — canonical mirror of the Notion Artefacts DB; last verified in lockstep 2026-08-21
    (BASIC/REWORK redesign session applied: 19 new effects, 4 tweaks, 2 KEEP edits — all 180 KEEP;
+   2026-11-14 (NO-347): Guidestone rework;
    2026-08-23 rework: 24 renames + 3 conspiracy swaps, effects unchanged;
    2026-08-24: 4 effect reassignments among 9 artefacts, rarity follows effect;
    rarity rebalance pass 1+2: 8 Uncommon->Common, 21 Rare->Uncommon => 50/54/50/26;
@@ -490,7 +491,7 @@ var ARTEFACTS = [
     conspiracy: "Operation Mockingbird", url: "https://en.wikipedia.org/wiki/Operation_Mockingbird",
     summary: "The Church Committee era confirmed the CIA had paid relationships with journalists; 'Mockingbird' became the name for the maximal version — a wired newsroom in every city. The press pass works everywhere." },
   { name: "Guidestone Chunks", key: "guidestone-blood-ritual", rarity: "Legendary", type: "Passive", bonus: ["Special"], status: "KEEP", implemented: true,
-    effect: "Artefacts you hold 2+ copies of trigger one extra time.",
+    effect: "While you have 5 or fewer Pieces on the board, your Trigger Artefacts trigger one extra time.",
     conspiracy: "The Georgia Guidestones", url: "https://en.wikipedia.org/wiki/Georgia_Guidestones",
     summary: "Granite slabs commissioned in 1980 by a pseudonymous 'R.C. Christian', engraving commandments for a post-catastrophe world — population capped at 500 million. Read as the elite's carved confession; bombed in 2022." },
   { name: "Illuminati Fridge Magnet", key: "illuminati-fridge-magnet", rarity: "Legendary", type: "Passive", bonus: ["Special"], status: "KEEP", implemented: true,

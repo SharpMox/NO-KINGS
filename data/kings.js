@@ -217,13 +217,16 @@ const KITS = {
   },
   // ---- LARRY, the 17th boss at wave 201 (NO-7) ----------------------------
   // Outside the 4x4 cast and outside ROSTER, but the KIT contract is the same.
+  // Three stacking phases off his starting army (NO-351): P1 Shop Seized, P2 +
+  // Curfew (no Deploy from Stock), P3 + Censorship (Artefacts stop triggering,
+  // total — standing rules included).
   larry: {
-    power_name: "Borrowed Time",
-    power_desc: "Your Clock drains twice as fast this wave.",
-    power_key: "borrowedtime",
-    ability_name: "The Bill Comes Due",
-    ability_desc: "Destroys your most valuable piece once per King you have defeated (up to 4).",
-    ability_key: "bill",
+    power_name: "Larry's Rules",
+    power_desc: "The Shop is closed. At 2/3 of his army left: no Deploys. At 1/3: your Artefacts stop triggering.",
+    power_key: "larry",
+    ability_name: "Confiscation",
+    ability_desc: "At the start of Phase 2 and 3, strips every Buff from your 2 most valuable Pieces.",
+    ability_key: "confiscate",
   },
 };
 
